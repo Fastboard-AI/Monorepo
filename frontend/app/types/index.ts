@@ -51,12 +51,48 @@ export interface Candidate {
   uploadedAt: Date;
 }
 
+export type JobStatus = "sourcing" | "reviewing" | "filled" | "closed";
+export type ExperienceLevel = "entry" | "mid" | "senior" | "lead" | "any";
+
+// Work style preferences for team members
+export interface WorkStyle {
+  communication: "async" | "sync" | "mixed";
+  collaboration: "independent" | "collaborative" | "balanced";
+  pace: "fast" | "steady" | "flexible";
+}
+
+// Team member = existing employee (not a candidate)
+export interface TeamMember {
+  id: string;
+  name: string;
+  role: string;
+  skills: Skill[];
+  experienceLevel: ExperienceLevel;
+  workStyle: WorkStyle;
+}
+
 export interface Team {
   id: string;
   name: string;
-  candidates: Candidate[];
+  members: TeamMember[];  // Existing employees, not candidates
   compatibilityScore: number;
   targetRole?: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface Job {
+  id: string;
+  title: string;
+  description?: string;
+  location?: string;
+  requiredSkills: string[];
+  experienceLevel: ExperienceLevel;
+  status: JobStatus;
+  candidateIds: string[];
+  teamId?: string;
+  createdAt: Date;
+  updatedAt: Date;
 }
 
 export type SortOption = "score" | "name" | "experience" | "uploadDate";

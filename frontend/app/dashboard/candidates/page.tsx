@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useCallback } from "react";
 import { useAuth, RedirectToSignIn } from "@clerk/nextjs";
-import { FileText, Users, Target, GitCompare } from "lucide-react";
+import { FileText, Users, Target, GitCompare, Sparkles } from "lucide-react";
 
 import { Header } from "../../components/Header";
 import { FilterBar } from "../../components/FilterBar";
@@ -11,6 +11,14 @@ import { BulkActionBar } from "../../components/BulkActionBar";
 import { ExportDropdown } from "../../components/ExportDropdown";
 import { CandidateComparisonPanel } from "../../components/CandidateComparisonPanel";
 import { CandidateDetailModal } from "../../components/CandidateDetailModal";
+import {
+  SourceCandidatesModal,
+  type SourcingCriteria,
+} from "../../components/SourceCandidatesModal";
+import {
+  SourcingStatusBanner,
+  type SourcingStatus,
+} from "../../components/SourcingStatusBanner";
 import { mockCandidates, getAllSkills } from "../../data/mockCandidates";
 import type {
   Candidate,
@@ -28,6 +36,12 @@ export default function CandidatesPage() {
   const [isComparisonOpen, setIsComparisonOpen] = useState(false);
   const [selectedCandidate, setSelectedCandidate] = useState<Candidate | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+
+  // Sourcing state
+  const [isSourceModalOpen, setIsSourceModalOpen] = useState(false);
+  const [sourcingStatus, setSourcingStatus] = useState<SourcingStatus>("idle");
+  const [sourcingCriteria, setSourcingCriteria] = useState<SourcingCriteria | null>(null);
+  const [sourcedCandidatesCount, setSourcedCandidatesCount] = useState(0);
 
   const [filters, setFilters] = useState<FilterState>({
     skills: [],
@@ -151,6 +165,26 @@ export default function CandidatesPage() {
     setIsModalOpen(true);
   }, []);
 
+  // Sourcing handlers
+  const handleStartSourcing = useCallback((criteria: SourcingCriteria) => {
+    setSourcingCriteria(criteria);
+    setSourcingStatus("sourcing");
+
+    // Simulate sourcing delay - in real app, this would be a backend call
+    setTimeout(() => {
+      // For demo, just show "found" count
+      const foundCount = Math.floor(Math.random() * 15) + 5;
+      setSourcedCandidatesCount(foundCount);
+      setSourcingStatus("completed");
+    }, 3000);
+  }, []);
+
+  const handleDismissSourcing = useCallback(() => {
+    setSourcingStatus("idle");
+    setSourcingCriteria(null);
+    setSourcedCandidatesCount(0);
+  }, []);
+
   // Stats
   const avgScore = useMemo(() => {
     if (candidates.length === 0) return 0;
@@ -196,6 +230,13 @@ export default function CandidatesPage() {
                 Compare ({comparisonCandidates.length})
               </button>
             )}
+            <button
+              onClick={() => setIsSourceModalOpen(true)}
+              className="btn-lift flex items-center gap-2 rounded-lg gradient-bg px-4 py-2.5 text-sm font-semibold text-white shadow-button"
+            >
+              <Sparkles className="h-4 w-4" />
+              Source Candidates
+            </button>
             <ExportDropdown candidates={filteredCandidates} selectedIds={selectedIds} />
           </div>
         </div>
@@ -256,6 +297,18 @@ export default function CandidatesPage() {
             </div>
           </div>
         </div>
+
+        {/* Sourcing Status Banner */}
+        {sourcingStatus !== "idle" && (
+          <div className="mb-6">
+            <SourcingStatusBanner
+              status={sourcingStatus}
+              criteria={sourcingCriteria}
+              candidatesFound={sourcedCandidatesCount}
+              onDismiss={handleDismissSourcing}
+            />
+          </div>
+        )}
 
         {/* Filter Bar with Select All */}
         <div className="mb-6 space-y-4">
@@ -347,6 +400,13 @@ export default function CandidatesPage() {
           setIsModalOpen(false);
           setSelectedCandidate(null);
         }}
+      />
+
+      {/* Source Candidates Modal */}
+      <SourceCandidatesModal
+        isOpen={isSourceModalOpen}
+        onClose={() => setIsSourceModalOpen(false)}
+        onStartSourcing={handleStartSourcing}
       />
     </div>
   );

@@ -26,6 +26,12 @@ export function Header() {
               Dashboard
             </Link>
             <Link
+              href="/dashboard/jobs"
+              className="rounded-lg px-3 py-2 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-900"
+            >
+              Jobs
+            </Link>
+            <Link
               href="/dashboard/teams"
               className="rounded-lg px-3 py-2 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-900"
             >
