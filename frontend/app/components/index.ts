@@ -6,3 +6,7 @@ export { ScoreBreakdown } from "./ScoreBreakdown";
 export { TeamPanel } from "./TeamPanel";
 export { FilterBar } from "./FilterBar";
 export { Header } from "./Header";
+export { SelectableCandidateCard } from "./SelectableCandidateCard";
+export { BulkActionBar } from "./BulkActionBar";
+export { ExportDropdown } from "./ExportDropdown";
+export { CandidateComparisonPanel } from "./CandidateComparisonPanel";
