@@ -26,3 +26,5 @@ export { CreateJobModal } from "./CreateJobModal";
 export { EditJobModal } from "./EditJobModal";
 export { JobTeamPanel } from "./JobTeamPanel";
 export { CreateTeamFromJobModal } from "./CreateTeamFromJobModal";
+export { JobSelector } from "./JobSelector";
+export { MatchedCandidateCard } from "./MatchedCandidateCard";

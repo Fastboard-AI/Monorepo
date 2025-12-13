@@ -31,6 +31,12 @@ export function Header() {
             >
               Jobs
             </Link>
+            <Link
+              href="/dashboard/resume-matcher"
+              className="rounded-lg px-3 py-2 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-900"
+            >
+              Resume Matcher
+            </Link>
           </nav>
           <div className="h-6 w-px bg-slate-200" />
           <UserButton
