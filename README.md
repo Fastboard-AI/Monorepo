@@ -98,6 +98,9 @@ App runs at http://localhost:3000
 | GET | `/api/jobs/:id` | Get job |
 | PUT | `/api/jobs/:id` | Update job |
 | DELETE | `/api/jobs/:id` | Delete job |
+| GET | `/api/jobs/:id/candidates` | Get job candidates |
+| POST | `/api/jobs/:id/candidates` | Link candidate to job |
+| DELETE | `/api/jobs/:id/candidates/:cid` | Remove candidate from job |
 | GET | `/api/teams` | List all teams |
 | POST | `/api/teams` | Create team |
 | GET | `/api/teams/:id` | Get team |
@@ -105,6 +108,7 @@ App runs at http://localhost:3000
 | DELETE | `/api/teams/:id` | Delete team |
 | POST | `/api/teams/:id/members` | Add team member |
 | DELETE | `/api/teams/:id/members/:mid` | Remove member |
+| POST | `/api/candidates` | Create candidate |
 | POST | `/api/sourcing/search` | AI candidate sourcing |
 | POST | `/add_to_db` | Add candidate with code analysis |
 | POST | `/analyse_repo` | Analyze GitHub repo (clones repo) |

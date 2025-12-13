@@ -60,6 +60,8 @@ Rust backend service for AI-powered talent matching, team management, and candid
    - `team_members` - Members with skills and work styles
    - `jobs` - Job postings with requirements
    - `candidates` - Candidates with AI-analyzed code characteristics
+   - `sourced_candidates` - Candidates from AI Sourcing & Resume Matcher
+   - `job_candidates` - Links candidates to jobs with match scores
 
 6. **Run the server**
    ```bash
@@ -271,6 +273,78 @@ Search for candidates (returns mock data).
 
 ---
 
+### Candidates
+
+#### POST /api/candidates
+Create a new candidate (used by AI Sourcing & Resume Matcher).
+
+**Request:**
+```json
+{
+  "name": "John Doe",
+  "email": "john@example.com",
+  "title": "Senior Engineer",
+  "skills": [{"name": "TypeScript", "level": "expert"}],
+  "experience": [{"title": "Engineer", "company": "Acme", "duration": "3 years"}],
+  "education": [{"degree": "B.S. CS", "institution": "MIT", "year": "2020"}],
+  "links": {"github": "https://github.com/johndoe"},
+  "talent_fit_score": 85,
+  "score_breakdown": {
+    "skillsMatch": 90,
+    "experienceMatch": 80,
+    "workStyleAlignment": 85,
+    "teamFit": 85
+  },
+  "source": "ai_sourcing"
+}
+```
+
+#### GET /api/jobs/:job_id/candidates
+Get all candidates linked to a job.
+
+**Response:**
+```json
+[
+  {
+    "id": "uuid",
+    "candidate": {
+      "id": "uuid",
+      "name": "John Doe",
+      "email": "john@example.com",
+      "title": "Senior Engineer",
+      "skills": [{"name": "TypeScript", "level": "expert"}],
+      "experience": [...],
+      "education": [...],
+      "links": {...},
+      "talent_fit_score": 85,
+      "score_breakdown": {...},
+      "source": "ai_sourcing",
+      "created_at": "2024-01-01T00:00:00Z"
+    },
+    "job_match_score": 88,
+    "team_compatibility_score": 82,
+    "added_at": "2024-01-01T00:00:00Z"
+  }
+]
+```
+
+#### POST /api/jobs/:job_id/candidates
+Link a candidate to a job.
+
+**Request:**
+```json
+{
+  "candidate_id": "uuid",
+  "job_match_score": 88,
+  "team_compatibility_score": 82
+}
+```
+
+#### DELETE /api/jobs/:job_id/candidates/:candidate_id
+Remove a candidate from a job.
+
+---
+
 ### Code Analysis (AI)
 
 #### POST /add_to_db
@@ -393,6 +467,7 @@ backend/
 │       ├── ep_jobs.rs             # Jobs CRUD
 │       ├── ep_teams.rs            # Teams CRUD + members
 │       ├── ep_sourcing.rs         # Candidate sourcing (mock)
+│       ├── ep_candidates.rs       # Candidates CRUD + job linking
 │       └── ep_match_candidates.rs # (WIP) Matching endpoint
 ├── schema.sql                     # Database schema (run in Neon)
 ├── Cargo.toml                     # Dependencies

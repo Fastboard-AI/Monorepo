@@ -111,6 +111,86 @@ export interface SourcedCandidate {
   source: string;
 }
 
+// Candidates API
+export interface ApiCandidateSkill {
+  name: string;
+  level: string;
+}
+
+export interface ApiCandidateExperience {
+  title: string;
+  company: string;
+  duration: string;
+  description?: string;
+}
+
+export interface ApiCandidateEducation {
+  degree: string;
+  institution: string;
+  year: string;
+}
+
+export interface ApiCandidateLinks {
+  github?: string;
+  linkedin?: string;
+  portfolio?: string;
+}
+
+export interface ApiScoreBreakdown {
+  skillsMatch: number;
+  experienceMatch: number;
+  workStyleAlignment: number;
+  teamFit: number;
+}
+
+export interface ApiCandidate {
+  id: string;
+  name: string;
+  email: string | null;
+  phone: string | null;
+  location: string | null;
+  title: string;
+  skills: ApiCandidateSkill[];
+  experience: ApiCandidateExperience[];
+  education: ApiCandidateEducation[];
+  links: ApiCandidateLinks;
+  talent_fit_score: number;
+  score_breakdown: ApiScoreBreakdown;
+  resume_file_name: string | null;
+  source: string;
+  created_at: string;
+}
+
+export interface CreateCandidateInput {
+  name: string;
+  email?: string;
+  phone?: string;
+  location?: string;
+  title: string;
+  skills: ApiCandidateSkill[];
+  experience: ApiCandidateExperience[];
+  education: ApiCandidateEducation[];
+  links: ApiCandidateLinks;
+  talent_fit_score: number;
+  score_breakdown: ApiScoreBreakdown;
+  resume_file_name?: string;
+  source: string;
+}
+
+export interface JobCandidateResponse {
+  id: string;
+  candidate: ApiCandidate;
+  job_match_score: number;
+  team_compatibility_score: number;
+  added_at: string;
+}
+
+export interface LinkCandidateInput {
+  candidate_id: string;
+  job_match_score?: number;
+  team_compatibility_score?: number;
+}
+
 export const api = {
   // Jobs
   getJobs: (): Promise<ApiJob[]> =>
@@ -182,5 +262,34 @@ export const api = {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(params),
+    }),
+
+  // Candidates
+  createCandidate: (data: CreateCandidateInput): Promise<ApiCandidate> =>
+    fetchJson(`${API_BASE}/api/candidates`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data),
+    }),
+
+  getJobCandidates: (jobId: string): Promise<JobCandidateResponse[]> =>
+    fetchJson(`${API_BASE}/api/jobs/${jobId}/candidates`),
+
+  addCandidateToJob: (
+    jobId: string,
+    data: LinkCandidateInput
+  ): Promise<{ success: boolean; id: string; candidate_id: string }> =>
+    fetchJson(`${API_BASE}/api/jobs/${jobId}/candidates`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data),
+    }),
+
+  removeCandidateFromJob: (
+    jobId: string,
+    candidateId: string
+  ): Promise<{ success: boolean }> =>
+    fetchJson(`${API_BASE}/api/jobs/${jobId}/candidates/${candidateId}`, {
+      method: "DELETE",
     }),
 };

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useAuth, RedirectToSignIn } from "@clerk/nextjs";
 import {
@@ -25,7 +25,7 @@ import { DeleteConfirmModal } from "../../../components/DeleteConfirmModal";
 import { JobTeamPanel } from "../../../components/JobTeamPanel";
 import { useJobs } from "../../../hooks/useJobs";
 import { useTeams } from "../../../hooks/useTeams";
-import { mockCandidates } from "../../../data/mockCandidates";
+import { api, JobCandidateResponse } from "../../../lib/api";
 import type { Candidate, Job, Team, ExperienceLevel, JobStatus } from "../../../types";
 
 const statusConfig: Record<Job["status"], { label: string; className: string }> = {
@@ -65,7 +65,6 @@ export default function JobDetailPage() {
     isLoading,
     updateJob,
     deleteJob,
-    removeCandidateFromJob,
     getJobById,
     linkTeamToJob,
     unlinkTeamFromJob,
@@ -80,12 +79,58 @@ export default function JobDetailPage() {
   const job = getJobById(jobId);
   const linkedTeam = job?.teamId ? getTeamById(job.teamId) ?? null : null;
 
-  // Get candidates for this job
-  const jobCandidates = useMemo(() => {
-    if (!job) return [];
-    return job.candidateIds
-      .map((id) => mockCandidates.find((c) => c.id === id))
-      .filter((c): c is Candidate => c !== undefined);
+  // Candidates state
+  const [jobCandidates, setJobCandidates] = useState<Candidate[]>([]);
+  const [candidatesLoading, setCandidatesLoading] = useState(false);
+
+  // Fetch candidates from API
+  useEffect(() => {
+    if (!job) return;
+
+    const fetchCandidates = async () => {
+      setCandidatesLoading(true);
+      try {
+        const response = await api.getJobCandidates(job.id);
+        const candidates: Candidate[] = response.map((jc: JobCandidateResponse) => ({
+          id: jc.candidate.id,
+          name: jc.candidate.name,
+          email: jc.candidate.email || undefined,
+          title: jc.candidate.title,
+          skills: jc.candidate.skills.map((s) => ({
+            name: s.name,
+            level: s.level as "beginner" | "intermediate" | "advanced" | "expert",
+          })),
+          experience: jc.candidate.experience.map((e) => ({
+            title: e.title,
+            company: e.company,
+            duration: e.duration,
+            description: e.description,
+          })),
+          education: jc.candidate.education.map((e) => ({
+            degree: e.degree,
+            institution: e.institution,
+            year: e.year,
+          })),
+          links: jc.candidate.links || {},
+          talentFitScore: jc.candidate.talent_fit_score,
+          scoreBreakdown: {
+            skillsMatch: jc.candidate.score_breakdown.skillsMatch,
+            experienceMatch: jc.candidate.score_breakdown.experienceMatch,
+            workStyleAlignment: jc.candidate.score_breakdown.workStyleAlignment,
+            teamFit: jc.candidate.score_breakdown.teamFit,
+          },
+          resumeFileName: jc.candidate.resume_file_name || undefined,
+          uploadedAt: new Date(jc.candidate.created_at),
+        }));
+        setJobCandidates(candidates);
+      } catch (error) {
+        console.error("Failed to fetch candidates:", error);
+      } finally {
+        setCandidatesLoading(false);
+      }
+    };
+
+    fetchCandidates();
   }, [job]);
 
   // Selection state
@@ -152,11 +197,16 @@ export default function JobDetailPage() {
   }, [deleteJob, jobId, router]);
 
   const handleRemoveCandidate = useCallback(
-    (candidateId: string) => {
-      removeCandidateFromJob(jobId, candidateId);
-      setComparisonCandidates((prev) => prev.filter((c) => c.id !== candidateId));
+    async (candidateId: string) => {
+      try {
+        await api.removeCandidateFromJob(jobId, candidateId);
+        setJobCandidates((prev) => prev.filter((c) => c.id !== candidateId));
+        setComparisonCandidates((prev) => prev.filter((c) => c.id !== candidateId));
+      } catch (error) {
+        console.error("Failed to remove candidate:", error);
+      }
     },
-    [jobId, removeCandidateFromJob]
+    [jobId]
   );
 
   // Team handlers
@@ -333,7 +383,12 @@ export default function JobDetailPage() {
         </div>
 
         {/* Candidates List */}
-        {jobCandidates.length === 0 ? (
+        {candidatesLoading ? (
+          <div className="rounded-xl border border-slate-200 bg-white p-12 text-center">
+            <div className="mx-auto h-8 w-8 animate-spin rounded-full border-4 border-indigo-200 border-t-indigo-600" />
+            <p className="mt-4 text-sm text-slate-500">Loading candidates...</p>
+          </div>
+        ) : jobCandidates.length === 0 ? (
           <div className="rounded-xl border-2 border-dashed border-slate-200 p-12 text-center">
             <FileText className="mx-auto h-12 w-12 text-slate-300" />
             <p className="mt-4 text-lg font-medium text-slate-600">

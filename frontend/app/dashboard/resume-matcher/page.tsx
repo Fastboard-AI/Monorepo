@@ -11,6 +11,7 @@ import {
   GitCompare,
 } from "lucide-react";
 import Link from "next/link";
+import { api } from "../../lib/api";
 import {
   Header,
   JobSelector,
@@ -187,6 +188,48 @@ export default function ResumeMatcherPage() {
       const overallB = (b.jobScore + b.teamScore) / 2;
       return overallB - overallA;
     });
+
+    // Automatically save all candidates to the database and link to job
+    for (const { candidate, jobScore, teamScore } of results) {
+      try {
+        const createdCandidate = await api.createCandidate({
+          name: candidate.name,
+          email: candidate.email || undefined,
+          title: candidate.title,
+          location: undefined,
+          skills: candidate.skills.map((s) => ({ name: s.name, level: s.level })),
+          experience: candidate.experience.map((e) => ({
+            title: e.title,
+            company: e.company,
+            duration: e.duration,
+            description: undefined,
+          })),
+          education: candidate.education.map((e) => ({
+            degree: e.degree,
+            institution: e.institution,
+            year: e.year,
+          })),
+          links: candidate.links || {},
+          talent_fit_score: candidate.talentFitScore,
+          score_breakdown: {
+            skillsMatch: candidate.scoreBreakdown.skillsMatch,
+            experienceMatch: candidate.scoreBreakdown.experienceMatch,
+            workStyleAlignment: candidate.scoreBreakdown.workStyleAlignment,
+            teamFit: candidate.scoreBreakdown.teamFit,
+          },
+          resume_file_name: candidate.resumeFileName,
+          source: "resume_matcher",
+        });
+
+        await api.addCandidateToJob(selectedJob.id, {
+          candidate_id: createdCandidate.id,
+          job_match_score: jobScore,
+          team_compatibility_score: teamScore,
+        });
+      } catch (error) {
+        console.error("Failed to save candidate:", error);
+      }
+    }
 
     setMatchedResults(results);
     setIsProcessing(false);
