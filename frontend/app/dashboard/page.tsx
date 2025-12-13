@@ -1,176 +1,90 @@
 "use client";
 
-import { useState, useMemo, useCallback } from "react";
+import { useMemo } from "react";
 import { useAuth, RedirectToSignIn } from "@clerk/nextjs";
+import Link from "next/link";
 import {
-  DndContext,
-  DragEndEvent,
-  DragOverlay,
-  DragStartEvent,
-  closestCenter,
-  PointerSensor,
-  useSensor,
-  useSensors,
-} from "@dnd-kit/core";
-import {
-  SortableContext,
-  verticalListSortingStrategy,
-} from "@dnd-kit/sortable";
-import { Users, TrendingUp, FileText, Target } from "lucide-react";
+  Briefcase,
+  Users,
+  Sparkles,
+  TrendingUp,
+  Plus,
+  ArrowRight,
+  Clock,
+  Target,
+  FileText,
+  Zap,
+} from "lucide-react";
 
-import {
-  Header,
-  FileUpload,
-  CandidateCard,
-  CandidateDetailModal,
-  TeamPanel,
-  FilterBar,
-  ScoreBreakdown,
-} from "../components";
-import {
-  mockCandidates,
-  getAllSkills,
-  calculateTeamCompatibility,
-} from "../data/mockCandidates";
-import type {
-  Candidate,
-  SortOption,
-  SortDirection,
-  FilterState,
-} from "../types";
+import { Header } from "../components";
+import { useJobsStorage } from "../hooks/useJobsStorage";
+import { useTeamsStorage } from "../hooks/useTeamsStorage";
+import { mockCandidates } from "../data/mockCandidates";
+
+const statusColors: Record<string, string> = {
+  sourcing: "bg-indigo-100 text-indigo-700",
+  reviewing: "bg-amber-100 text-amber-700",
+  filled: "bg-emerald-100 text-emerald-700",
+  closed: "bg-slate-100 text-slate-500",
+};
 
 export default function DashboardPage() {
   const { isLoaded, isSignedIn } = useAuth();
+  const { jobs, isLoading: jobsLoading } = useJobsStorage();
+  const { teams, isLoading: teamsLoading } = useTeamsStorage();
 
-  const [candidates, setCandidates] = useState<Candidate[]>(mockCandidates);
-  const [teamCandidates, setTeamCandidates] = useState<Candidate[]>([]);
-  const [selectedCandidate, setSelectedCandidate] = useState<Candidate | null>(null);
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [activeId, setActiveId] = useState<string | null>(null);
-
-  const [filters, setFilters] = useState<FilterState>({
-    skills: [],
-    minScore: 0,
-    searchQuery: "",
-  });
-  const [sortBy, setSortBy] = useState<SortOption>("score");
-  const [sortDirection, setSortDirection] = useState<SortDirection>("desc");
-
-  const sensors = useSensors(
-    useSensor(PointerSensor, {
-      activationConstraint: {
-        distance: 8,
-      },
-    })
-  );
-
-  const availableSkills = useMemo(() => getAllSkills(candidates), [candidates]);
-
-  const filteredCandidates = useMemo(() => {
-    let result = candidates.filter(
-      (c) => !teamCandidates.some((tc) => tc.id === c.id)
+  // Calculate stats
+  const stats = useMemo(() => {
+    const activeJobs = jobs.filter(
+      (j) => j.status === "sourcing" || j.status === "reviewing"
+    ).length;
+    const totalCandidates = jobs.reduce(
+      (sum, j) => sum + j.candidateIds.length,
+      0
     );
+    const totalTeamMembers = teams.reduce(
+      (sum, t) => sum + t.members.length,
+      0
+    );
+    const avgTeamScore =
+      teams.length > 0
+        ? Math.round(
+            teams.reduce((sum, t) => sum + t.compatibilityScore, 0) /
+              teams.length
+          )
+        : 0;
 
-    if (filters.searchQuery) {
-      const query = filters.searchQuery.toLowerCase();
-      result = result.filter(
-        (c) =>
-          c.name.toLowerCase().includes(query) ||
-          c.title.toLowerCase().includes(query) ||
-          c.skills.some((s) => s.name.toLowerCase().includes(query))
-      );
-    }
+    return {
+      totalJobs: jobs.length,
+      activeJobs,
+      totalTeams: teams.length,
+      totalCandidates,
+      totalTeamMembers,
+      avgTeamScore,
+    };
+  }, [jobs, teams]);
 
-    if (filters.skills.length > 0) {
-      result = result.filter((c) =>
-        filters.skills.some((skill) =>
-          c.skills.some((s) => s.name === skill)
-        )
-      );
-    }
+  // Recent jobs (last 5)
+  const recentJobs = useMemo(() => {
+    return [...jobs]
+      .sort(
+        (a, b) =>
+          new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
+      )
+      .slice(0, 5);
+  }, [jobs]);
 
-    if (filters.minScore > 0) {
-      result = result.filter((c) => c.talentFitScore >= filters.minScore);
-    }
+  // Recent teams (last 3)
+  const recentTeams = useMemo(() => {
+    return [...teams]
+      .sort(
+        (a, b) =>
+          new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
+      )
+      .slice(0, 3);
+  }, [teams]);
 
-    result.sort((a, b) => {
-      let comparison = 0;
-      switch (sortBy) {
-        case "score":
-          comparison = a.talentFitScore - b.talentFitScore;
-          break;
-        case "name":
-          comparison = a.name.localeCompare(b.name);
-          break;
-        case "experience":
-          comparison = a.experience.length - b.experience.length;
-          break;
-        case "uploadDate":
-          comparison =
-            new Date(a.uploadedAt).getTime() - new Date(b.uploadedAt).getTime();
-          break;
-      }
-      return sortDirection === "desc" ? -comparison : comparison;
-    });
-
-    return result;
-  }, [candidates, teamCandidates, filters, sortBy, sortDirection]);
-
-  const teamCompatibilityScore = useMemo(
-    () => calculateTeamCompatibility(teamCandidates),
-    [teamCandidates]
-  );
-
-  const handleFilesSelected = useCallback((files: File[]) => {
-    if (files.length === 0) return;
-    setIsProcessing(true);
-    setTimeout(() => {
-      setIsProcessing(false);
-    }, 2000);
-  }, []);
-
-  const handleCandidateClick = useCallback((candidate: Candidate) => {
-    setSelectedCandidate(candidate);
-    setIsModalOpen(true);
-  }, []);
-
-  const handleAddToTeam = useCallback((candidate: Candidate) => {
-    if (!teamCandidates.some((c) => c.id === candidate.id)) {
-      setTeamCandidates((prev) => [...prev, candidate]);
-    }
-  }, [teamCandidates]);
-
-  const handleRemoveFromTeam = useCallback((candidateId: string) => {
-    setTeamCandidates((prev) => prev.filter((c) => c.id !== candidateId));
-  }, []);
-
-  const handleDragStart = useCallback((event: DragStartEvent) => {
-    setActiveId(event.active.id as string);
-  }, []);
-
-  const handleDragEnd = useCallback(
-    (event: DragEndEvent) => {
-      setActiveId(null);
-      const { active, over } = event;
-
-      if (!over) return;
-
-      if (over.id === "team-panel") {
-        const candidate = candidates.find((c) => c.id === active.id);
-        if (candidate && !teamCandidates.some((c) => c.id === candidate.id)) {
-          setTeamCandidates((prev) => [...prev, candidate]);
-        }
-      }
-    },
-    [candidates, teamCandidates]
-  );
-
-  const activeCandidate = activeId
-    ? candidates.find((c) => c.id === activeId)
-    : null;
-
-  if (!isLoaded) {
+  if (!isLoaded || jobsLoading || teamsLoading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-slate-50">
         <div className="h-8 w-8 animate-spin rounded-full border-4 border-indigo-200 border-t-indigo-600" />
@@ -183,217 +97,316 @@ export default function DashboardPage() {
   }
 
   return (
-    <DndContext
-      sensors={sensors}
-      collisionDetection={closestCenter}
-      onDragStart={handleDragStart}
-      onDragEnd={handleDragEnd}
-    >
-      <div className="min-h-screen bg-slate-50">
-        <Header />
+    <div className="min-h-screen bg-slate-50">
+      <Header />
 
-        <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
-          <div className="mb-8">
-            <h1 className="text-3xl font-bold tracking-tight text-slate-900">
-              Team <span className="gradient-text">Matching</span>
-            </h1>
-            <p className="mt-2 text-slate-600">
-              Upload resumes and build your perfect team with AI-powered insights.
-            </p>
-          </div>
+      <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
+        {/* Welcome Section */}
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold tracking-tight text-slate-900">
+            Welcome to <span className="gradient-text">FastboardAI</span>
+          </h1>
+          <p className="mt-2 text-slate-600">
+            Build your dream team with AI-powered candidate matching.
+          </p>
+        </div>
 
-          <div className="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            <div className="card-lift rounded-xl border border-slate-100 bg-white p-4 shadow-card">
-              <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-50">
-                  <FileText className="h-5 w-5 text-indigo-600" />
-                </div>
-                <div>
-                  <p className="text-2xl font-bold text-slate-900">
-                    {candidates.length}
-                  </p>
-                  <p className="text-sm text-slate-500">Candidates</p>
-                </div>
+        {/* Stats Grid */}
+        <div className="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="card-lift rounded-xl border border-slate-100 bg-white p-5 shadow-card">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-slate-500">Active Jobs</p>
+                <p className="mt-1 text-3xl font-bold text-slate-900">
+                  {stats.activeJobs}
+                </p>
+                <p className="mt-1 text-xs text-slate-400">
+                  {stats.totalJobs} total
+                </p>
               </div>
-            </div>
-
-            <div className="card-lift rounded-xl border border-slate-100 bg-white p-4 shadow-card">
-              <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-violet-50">
-                  <Users className="h-5 w-5 text-violet-600" />
-                </div>
-                <div>
-                  <p className="text-2xl font-bold text-slate-900">
-                    {teamCandidates.length}
-                  </p>
-                  <p className="text-sm text-slate-500">Team Members</p>
-                </div>
-              </div>
-            </div>
-
-            <div className="card-lift rounded-xl border border-slate-100 bg-white p-4 shadow-card">
-              <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-50">
-                  <Target className="h-5 w-5 text-emerald-600" />
-                </div>
-                <div>
-                  <p className="text-2xl font-bold text-slate-900">
-                    {teamCompatibilityScore}%
-                  </p>
-                  <p className="text-sm text-slate-500">Team Score</p>
-                </div>
-              </div>
-            </div>
-
-            <div className="card-lift rounded-xl border border-slate-100 bg-white p-4 shadow-card">
-              <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-50">
-                  <TrendingUp className="h-5 w-5 text-amber-600" />
-                </div>
-                <div>
-                  <p className="text-2xl font-bold text-slate-900">
-                    {availableSkills.length}
-                  </p>
-                  <p className="text-sm text-slate-500">Unique Skills</p>
-                </div>
+              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-indigo-50">
+                <Briefcase className="h-6 w-6 text-indigo-600" />
               </div>
             </div>
           </div>
 
-          <div className="mb-8">
-            <FileUpload
-              onFilesSelected={handleFilesSelected}
-              isProcessing={isProcessing}
-            />
+          <div className="card-lift rounded-xl border border-slate-100 bg-white p-5 shadow-card">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-slate-500">Teams</p>
+                <p className="mt-1 text-3xl font-bold text-slate-900">
+                  {stats.totalTeams}
+                </p>
+                <p className="mt-1 text-xs text-slate-400">
+                  {stats.totalTeamMembers} members
+                </p>
+              </div>
+              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-violet-50">
+                <Users className="h-6 w-6 text-violet-600" />
+              </div>
+            </div>
           </div>
 
-          <div className="grid gap-8 lg:grid-cols-3">
-            <div className="lg:col-span-2 space-y-6">
-              <FilterBar
-                filters={filters}
-                onFiltersChange={setFilters}
-                sortBy={sortBy}
-                sortDirection={sortDirection}
-                onSortChange={(newSortBy, newDirection) => {
-                  setSortBy(newSortBy);
-                  setSortDirection(newDirection);
-                }}
-                availableSkills={availableSkills}
-                totalCandidates={candidates.length - teamCandidates.length}
-                filteredCount={filteredCandidates.length}
-              />
+          <div className="card-lift rounded-xl border border-slate-100 bg-white p-5 shadow-card">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-slate-500">Candidates</p>
+                <p className="mt-1 text-3xl font-bold text-slate-900">
+                  {stats.totalCandidates}
+                </p>
+                <p className="mt-1 text-xs text-slate-400">sourced for jobs</p>
+              </div>
+              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-emerald-50">
+                <FileText className="h-6 w-6 text-emerald-600" />
+              </div>
+            </div>
+          </div>
 
-              <SortableContext
-                items={filteredCandidates.map((c) => c.id)}
-                strategy={verticalListSortingStrategy}
+          <div className="card-lift rounded-xl border border-slate-100 bg-white p-5 shadow-card">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-slate-500">Avg Team Score</p>
+                <p className="mt-1 text-3xl font-bold text-slate-900">
+                  {stats.avgTeamScore}%
+                </p>
+                <p className="mt-1 text-xs text-slate-400">compatibility</p>
+              </div>
+              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-amber-50">
+                <Target className="h-6 w-6 text-amber-600" />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Quick Actions */}
+        <div className="mb-8">
+          <h2 className="mb-4 text-lg font-semibold text-slate-900">
+            Quick Actions
+          </h2>
+          <div className="grid gap-4 sm:grid-cols-3">
+            <Link
+              href="/dashboard/jobs"
+              className="group flex items-center gap-4 rounded-xl border border-slate-100 bg-white p-5 shadow-card transition-all hover:border-indigo-200 hover:shadow-md"
+            >
+              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-500 to-violet-500">
+                <Plus className="h-6 w-6 text-white" />
+              </div>
+              <div className="flex-1">
+                <p className="font-semibold text-slate-900">Create Job</p>
+                <p className="text-sm text-slate-500">Post a new position</p>
+              </div>
+              <ArrowRight className="h-5 w-5 text-slate-300 transition-transform group-hover:translate-x-1 group-hover:text-indigo-500" />
+            </Link>
+
+            <Link
+              href="/dashboard/resume-matcher"
+              className="group flex items-center gap-4 rounded-xl border border-slate-100 bg-white p-5 shadow-card transition-all hover:border-violet-200 hover:shadow-md"
+            >
+              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-violet-500 to-purple-500">
+                <Sparkles className="h-6 w-6 text-white" />
+              </div>
+              <div className="flex-1">
+                <p className="font-semibold text-slate-900">Match Resumes</p>
+                <p className="text-sm text-slate-500">AI-powered matching</p>
+              </div>
+              <ArrowRight className="h-5 w-5 text-slate-300 transition-transform group-hover:translate-x-1 group-hover:text-violet-500" />
+            </Link>
+
+            <Link
+              href="/dashboard/teams"
+              className="group flex items-center gap-4 rounded-xl border border-slate-100 bg-white p-5 shadow-card transition-all hover:border-emerald-200 hover:shadow-md"
+            >
+              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-500 to-teal-500">
+                <Users className="h-6 w-6 text-white" />
+              </div>
+              <div className="flex-1">
+                <p className="font-semibold text-slate-900">Manage Teams</p>
+                <p className="text-sm text-slate-500">Build your team</p>
+              </div>
+              <ArrowRight className="h-5 w-5 text-slate-300 transition-transform group-hover:translate-x-1 group-hover:text-emerald-500" />
+            </Link>
+          </div>
+        </div>
+
+        {/* Content Grid */}
+        <div className="grid gap-8 lg:grid-cols-3">
+          {/* Recent Jobs */}
+          <div className="lg:col-span-2">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-semibold text-slate-900">
+                Recent Jobs
+              </h2>
+              <Link
+                href="/dashboard/jobs"
+                className="text-sm font-medium text-indigo-600 hover:text-indigo-700"
               >
-                <div className="space-y-4">
-                  {filteredCandidates.map((candidate) => (
-                    <div
-                      key={candidate.id}
-                      onClick={() => handleCandidateClick(candidate)}
-                      className="cursor-pointer"
-                    >
-                      <CandidateCard
-                        candidate={candidate}
-                        isDraggable={true}
-                        onSelect={handleAddToTeam}
-                        isSelected={teamCandidates.some(
-                          (c) => c.id === candidate.id
-                        )}
-                      />
-                    </div>
-                  ))}
-
-                  {filteredCandidates.length === 0 && (
-                    <div className="rounded-xl border-2 border-dashed border-slate-200 p-12 text-center">
-                      <p className="text-lg font-medium text-slate-600">
-                        No candidates match your filters
-                      </p>
-                      <p className="mt-1 text-sm text-slate-500">
-                        Try adjusting your search criteria
-                      </p>
-                    </div>
-                  )}
-                </div>
-              </SortableContext>
+                View all
+              </Link>
             </div>
 
-            <div className="space-y-6">
-              <TeamPanel
-                candidates={teamCandidates}
-                compatibilityScore={teamCompatibilityScore}
-                onRemoveCandidate={handleRemoveFromTeam}
-                targetRole="Full-Stack Team"
-              />
+            {recentJobs.length === 0 ? (
+              <div className="rounded-xl border-2 border-dashed border-slate-200 bg-white p-8 text-center">
+                <Briefcase className="mx-auto h-10 w-10 text-slate-300" />
+                <p className="mt-3 font-medium text-slate-600">No jobs yet</p>
+                <p className="mt-1 text-sm text-slate-500">
+                  Create your first job to start hiring
+                </p>
+                <Link
+                  href="/dashboard/jobs"
+                  className="mt-4 inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700"
+                >
+                  <Plus className="h-4 w-4" />
+                  Create Job
+                </Link>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {recentJobs.map((job) => (
+                  <Link
+                    key={job.id}
+                    href={`/dashboard/jobs/${job.id}`}
+                    className="group flex items-center gap-4 rounded-xl border border-slate-100 bg-white p-4 shadow-card transition-all hover:border-slate-200 hover:shadow-md"
+                  >
+                    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-slate-100">
+                      <Briefcase className="h-5 w-5 text-slate-600" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <p className="font-medium text-slate-900 truncate">
+                          {job.title}
+                        </p>
+                        <span
+                          className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+                            statusColors[job.status]
+                          }`}
+                        >
+                          {job.status}
+                        </span>
+                      </div>
+                      <div className="mt-1 flex items-center gap-3 text-sm text-slate-500">
+                        <span className="flex items-center gap-1">
+                          <Users className="h-3.5 w-3.5" />
+                          {job.candidateIds.length} candidates
+                        </span>
+                        {job.requiredSkills.length > 0 && (
+                          <span className="truncate">
+                            {job.requiredSkills.slice(0, 2).join(", ")}
+                            {job.requiredSkills.length > 2 && "..."}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <ArrowRight className="h-5 w-5 text-slate-300 transition-transform group-hover:translate-x-1 group-hover:text-slate-500" />
+                  </Link>
+                ))}
+              </div>
+            )}
+          </div>
 
-              {teamCandidates.length > 0 && (
-                <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-card">
-                  <h3 className="mb-4 font-semibold text-slate-900">
-                    Team Score Breakdown
-                  </h3>
-                  <ScoreBreakdown
-                    breakdown={{
-                      skillsMatch: Math.round(
-                        teamCandidates.reduce(
-                          (sum, c) => sum + c.scoreBreakdown.skillsMatch,
-                          0
-                        ) / teamCandidates.length
-                      ),
-                      experienceMatch: Math.round(
-                        teamCandidates.reduce(
-                          (sum, c) => sum + c.scoreBreakdown.experienceMatch,
-                          0
-                        ) / teamCandidates.length
-                      ),
-                      workStyleAlignment: Math.round(
-                        teamCandidates.reduce(
-                          (sum, c) => sum + c.scoreBreakdown.workStyleAlignment,
-                          0
-                        ) / teamCandidates.length
-                      ),
-                      teamFit: Math.round(
-                        teamCandidates.reduce(
-                          (sum, c) => sum + c.scoreBreakdown.teamFit,
-                          0
-                        ) / teamCandidates.length
-                      ),
-                    }}
-                    showChart={true}
-                  />
+          {/* Teams Sidebar */}
+          <div>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-lg font-semibold text-slate-900">Teams</h2>
+              <Link
+                href="/dashboard/teams"
+                className="text-sm font-medium text-indigo-600 hover:text-indigo-700"
+              >
+                View all
+              </Link>
+            </div>
+
+            {recentTeams.length === 0 ? (
+              <div className="rounded-xl border-2 border-dashed border-slate-200 bg-white p-6 text-center">
+                <Users className="mx-auto h-8 w-8 text-slate-300" />
+                <p className="mt-2 font-medium text-slate-600">No teams yet</p>
+                <p className="mt-1 text-sm text-slate-500">
+                  Create a team to organize your hiring
+                </p>
+                <Link
+                  href="/dashboard/teams"
+                  className="mt-3 inline-flex items-center gap-1.5 text-sm font-medium text-indigo-600 hover:text-indigo-700"
+                >
+                  <Plus className="h-4 w-4" />
+                  Create Team
+                </Link>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {recentTeams.map((team) => (
+                  <Link
+                    key={team.id}
+                    href="/dashboard/teams"
+                    className="group block rounded-xl border border-slate-100 bg-white p-4 shadow-card transition-all hover:border-slate-200 hover:shadow-md"
+                  >
+                    <div className="flex items-center justify-between">
+                      <p className="font-medium text-slate-900">{team.name}</p>
+                      <div className="flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700">
+                        <TrendingUp className="h-3 w-3" />
+                        {team.compatibilityScore}%
+                      </div>
+                    </div>
+                    <div className="mt-2 flex items-center gap-2 text-sm text-slate-500">
+                      <Users className="h-3.5 w-3.5" />
+                      {team.members.length} member
+                      {team.members.length !== 1 ? "s" : ""}
+                      {team.targetRole && (
+                        <>
+                          <span className="text-slate-300">•</span>
+                          <span className="truncate">{team.targetRole}</span>
+                        </>
+                      )}
+                    </div>
+                    {team.members.length > 0 && (
+                      <div className="mt-2 flex -space-x-2">
+                        {team.members.slice(0, 4).map((member) => (
+                          <div
+                            key={member.id}
+                            className="flex h-7 w-7 items-center justify-center rounded-full border-2 border-white bg-gradient-to-br from-indigo-400 to-violet-400 text-xs font-medium text-white"
+                            title={member.name}
+                          >
+                            {member.name
+                              .split(" ")
+                              .map((n) => n[0])
+                              .join("")
+                              .slice(0, 2)}
+                          </div>
+                        ))}
+                        {team.members.length > 4 && (
+                          <div className="flex h-7 w-7 items-center justify-center rounded-full border-2 border-white bg-slate-200 text-xs font-medium text-slate-600">
+                            +{team.members.length - 4}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </Link>
+                ))}
+              </div>
+            )}
+
+            {/* Getting Started Card */}
+            <div className="mt-6 rounded-xl bg-gradient-to-br from-indigo-500 to-violet-500 p-5 text-white">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-white/20">
+                  <Zap className="h-5 w-5" />
                 </div>
-              )}
+                <div>
+                  <p className="font-semibold">Pro Tip</p>
+                  <p className="text-sm text-indigo-100">
+                    Use Resume Matcher for bulk candidate screening
+                  </p>
+                </div>
+              </div>
+              <Link
+                href="/dashboard/resume-matcher"
+                className="mt-4 flex items-center justify-center gap-2 rounded-lg bg-white/20 px-4 py-2 text-sm font-medium transition-colors hover:bg-white/30"
+              >
+                <Sparkles className="h-4 w-4" />
+                Try Resume Matcher
+              </Link>
             </div>
           </div>
-        </main>
-
-        <CandidateDetailModal
-          candidate={selectedCandidate}
-          isOpen={isModalOpen}
-          onClose={() => {
-            setIsModalOpen(false);
-            setSelectedCandidate(null);
-          }}
-          onAddToTeam={handleAddToTeam}
-          isInTeam={
-            selectedCandidate
-              ? teamCandidates.some((c) => c.id === selectedCandidate.id)
-              : false
-          }
-        />
-
-        <DragOverlay>
-          {activeCandidate && (
-            <div className="opacity-80">
-              <CandidateCard
-                candidate={activeCandidate}
-                isDraggable={false}
-                isCompact={true}
-              />
-            </div>
-          )}
-        </DragOverlay>
-      </div>
-    </DndContext>
+        </div>
+      </main>
+    </div>
   );
 }
