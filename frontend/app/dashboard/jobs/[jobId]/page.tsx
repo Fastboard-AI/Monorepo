@@ -9,7 +9,6 @@ import {
   MapPin,
   Clock,
   Users,
-  Sparkles,
   Pencil,
   Trash2,
   GitCompare,
@@ -23,7 +22,6 @@ import { CandidateComparisonPanel } from "../../../components/CandidateCompariso
 import { ExportDropdown } from "../../../components/ExportDropdown";
 import { EditJobModal } from "../../../components/EditJobModal";
 import { DeleteConfirmModal } from "../../../components/DeleteConfirmModal";
-import { SourceCandidatesModal } from "../../../components/SourceCandidatesModal";
 import { JobTeamPanel } from "../../../components/JobTeamPanel";
 import { useJobs } from "../../../hooks/useJobs";
 import { useTeams } from "../../../hooks/useTeams";
@@ -64,11 +62,9 @@ export default function JobDetailPage() {
   const jobId = params.jobId as string;
 
   const {
-    jobs,
     isLoading,
     updateJob,
     deleteJob,
-    addCandidatesToJob,
     removeCandidateFromJob,
     getJobById,
     linkTeamToJob,
@@ -102,7 +98,6 @@ export default function JobDetailPage() {
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
-  const [isSourceModalOpen, setIsSourceModalOpen] = useState(false);
 
   // Selection handlers
   const handleToggleSelect = useCallback((id: string) => {
@@ -162,25 +157,6 @@ export default function JobDetailPage() {
       setComparisonCandidates((prev) => prev.filter((c) => c.id !== candidateId));
     },
     [jobId, removeCandidateFromJob]
-  );
-
-  const handleStartSourcing = useCallback(
-    (criteria: {
-      jobTitle: string;
-      skills: string[];
-      location?: string;
-      experienceLevel: ExperienceLevel;
-      sources: ("linkedin" | "github" | "portfolio")[];
-    }) => {
-      // Simulate adding some mock candidates
-      const availableIds = mockCandidates
-        .filter((c) => !job?.candidateIds.includes(c.id))
-        .map((c) => c.id);
-      const newIds = availableIds.slice(0, Math.floor(Math.random() * 3) + 1);
-      addCandidatesToJob(jobId, newIds);
-      setIsSourceModalOpen(false);
-    },
-    [addCandidatesToJob, job?.candidateIds, jobId]
   );
 
   // Team handlers
@@ -308,13 +284,6 @@ export default function JobDetailPage() {
             </div>
             <div className="flex items-center gap-2">
               <button
-                onClick={() => setIsSourceModalOpen(true)}
-                className="flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-indigo-700"
-              >
-                <Sparkles className="h-4 w-4" />
-                Source Candidates
-              </button>
-              <button
                 onClick={() => setIsEditModalOpen(true)}
                 className="rounded-lg border border-slate-200 p-2 text-slate-600 hover:bg-slate-50"
                 title="Edit job"
@@ -368,18 +337,11 @@ export default function JobDetailPage() {
           <div className="rounded-xl border-2 border-dashed border-slate-200 p-12 text-center">
             <FileText className="mx-auto h-12 w-12 text-slate-300" />
             <p className="mt-4 text-lg font-medium text-slate-600">
-              No candidates sourced yet
+              No candidates yet
             </p>
             <p className="mt-1 text-sm text-slate-500">
-              Click "Source Candidates" to find talent for this role
+              Use AI Sourcing to find candidates for this role
             </p>
-            <button
-              onClick={() => setIsSourceModalOpen(true)}
-              className="mt-6 inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-indigo-700"
-            >
-              <Sparkles className="h-4 w-4" />
-              Source Candidates
-            </button>
           </div>
         ) : (
           <div className="space-y-4">
@@ -443,12 +405,6 @@ export default function JobDetailPage() {
         confirmLabel="Delete Job"
         onConfirm={handleConfirmDelete}
         onCancel={() => setIsDeleteModalOpen(false)}
-      />
-
-      <SourceCandidatesModal
-        isOpen={isSourceModalOpen}
-        onClose={() => setIsSourceModalOpen(false)}
-        onStartSourcing={handleStartSourcing}
       />
     </div>
   );

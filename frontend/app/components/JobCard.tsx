@@ -8,7 +8,6 @@ import {
   Pencil,
   Trash2,
   Eye,
-  Sparkles,
 } from "lucide-react";
 import type { Job } from "../types";
 
@@ -17,7 +16,6 @@ interface JobCardProps {
   onEdit: (job: Job) => void;
   onDelete: (job: Job) => void;
   onViewDetails: (job: Job) => void;
-  onSourceCandidates: (job: Job) => void;
 }
 
 const statusConfig: Record<
@@ -55,7 +53,6 @@ export function JobCard({
   onEdit,
   onDelete,
   onViewDetails,
-  onSourceCandidates,
 }: JobCardProps) {
   const status = statusConfig[job.status];
   const createdDate = new Date(job.createdAt).toLocaleDateString("en-US", {
@@ -146,13 +143,6 @@ export function JobCard({
         >
           <Eye className="h-4 w-4" />
           View
-        </button>
-        <button
-          onClick={() => onSourceCandidates(job)}
-          className="flex flex-1 items-center justify-center gap-1.5 rounded-lg gradient-bg px-3 py-2 text-sm font-medium text-white shadow-sm transition-all hover:shadow-md"
-        >
-          <Sparkles className="h-4 w-4" />
-          Source
         </button>
         <button
           onClick={() => onEdit(job)}

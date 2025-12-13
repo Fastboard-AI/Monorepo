@@ -17,7 +17,6 @@ import { JobCard } from "../../components/JobCard";
 import { CreateJobModal } from "../../components/CreateJobModal";
 import { EditJobModal } from "../../components/EditJobModal";
 import { DeleteConfirmModal } from "../../components/DeleteConfirmModal";
-import { SourceCandidatesModal } from "../../components/SourceCandidatesModal";
 import { useJobs } from "../../hooks/useJobs";
 import type { Job, ExperienceLevel, JobStatus } from "../../types";
 
@@ -30,14 +29,12 @@ export default function JobsPage() {
     createJob,
     updateJob,
     deleteJob,
-    addCandidatesToJob,
   } = useJobs();
 
   // Modal states
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
-  const [isSourceModalOpen, setIsSourceModalOpen] = useState(false);
 
   // Selected job for operations
   const [selectedJob, setSelectedJob] = useState<Job | null>(null);
@@ -130,35 +127,6 @@ export default function JobsPage() {
       router.push(`/dashboard/jobs/${job.id}`);
     },
     [router]
-  );
-
-  const handleSourceCandidates = useCallback((job: Job) => {
-    setSelectedJob(job);
-    setIsSourceModalOpen(true);
-  }, []);
-
-  const handleStartSourcing = useCallback(
-    (criteria: {
-      jobTitle: string;
-      skills: string[];
-      location?: string;
-      experienceLevel: ExperienceLevel;
-      sources: ("linkedin" | "github" | "portfolio")[];
-    }) => {
-      // In a real app, this would trigger backend sourcing
-      // For now, simulate adding some mock candidate IDs
-      if (selectedJob) {
-        // Simulate finding some candidates
-        const mockFoundIds = ["1", "2", "3"].slice(
-          0,
-          Math.floor(Math.random() * 3) + 1
-        );
-        addCandidatesToJob(selectedJob.id, mockFoundIds);
-      }
-      setIsSourceModalOpen(false);
-      setSelectedJob(null);
-    },
-    [addCandidatesToJob, selectedJob]
   );
 
   if (!isLoaded || isLoading) {
@@ -299,7 +267,6 @@ export default function JobsPage() {
                 onEdit={handleEditJob}
                 onDelete={handleDeleteClick}
                 onViewDetails={handleViewDetails}
-                onSourceCandidates={handleSourceCandidates}
               />
             ))}
           </div>
@@ -333,15 +300,6 @@ export default function JobsPage() {
           setIsDeleteModalOpen(false);
           setSelectedJob(null);
         }}
-      />
-
-      <SourceCandidatesModal
-        isOpen={isSourceModalOpen}
-        onClose={() => {
-          setIsSourceModalOpen(false);
-          setSelectedJob(null);
-        }}
-        onStartSourcing={handleStartSourcing}
       />
     </div>
   );
