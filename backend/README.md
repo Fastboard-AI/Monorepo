@@ -14,6 +14,7 @@ Rust backend service for AI-powered talent matching, team management, and candid
 - Rust (2024 edition)
 - PostgreSQL database (or Neon account)
 - Google Gemini API key
+- GitHub Personal Access Token (for `/analyse_github` endpoint)
 
 ## Setup
 
@@ -32,6 +33,7 @@ Rust backend service for AI-powered talent matching, team management, and candid
    ```
    GEMINI_API_KEY=your_gemini_api_key
    DATABASE_URL=postgresql://user:password@host/database?sslmode=require
+   GITHUB_TOKEN=ghp_your_github_token
    ```
 
 4. **Configure `Rocket.toml`**
@@ -288,7 +290,7 @@ Add a candidate with AI-analyzed code characteristics.
 ```
 
 #### POST /analyse_repo
-Analyze a GitHub repository (does not store in DB).
+Analyze a GitHub repository by cloning it (does not store in DB).
 
 **Request:**
 ```json
@@ -312,6 +314,40 @@ Analyze a GitHub repository (does not store in DB).
   "test_structure_modularity_ratio": 0.8
 }
 ```
+
+#### POST /analyse_github
+Analyze a GitHub user's coding style via their commit history. This is more accurate for group projects as it only analyzes code the user actually wrote.
+
+**Request:**
+```json
+{
+  "username": "octocat"
+}
+```
+
+**Response:**
+```json
+{
+  "avg_lines_per_function": 25.5,
+  "functional_vs_oop_ratio": 0.6,
+  "recursion_vs_loop_ratio": 0.2,
+  "dependency_coupling_index": 0.4,
+  "modularity_index_score": 0.7,
+  "avg_nesting_depth": 2.3,
+  "abstraction_layer_count": 3.0,
+  "immutability_score": 0.65,
+  "error_handling_centralization_score": 0.5,
+  "test_structure_modularity_ratio": 0.8
+}
+```
+
+**How it works:**
+- Fetches user's top 5 non-forked repositories
+- Collects up to 50 commits authored by the user
+- Extracts code patches/diffs from each commit (max 50 lines per patch)
+- Skips merge commits and tiny changes (<5 lines)
+- Sends to Gemini for analysis
+- Returns CodeCharacteristics based only on code the user wrote
 
 ---
 
@@ -346,10 +382,14 @@ backend/
 │   │   ├── mod.rs                 # AI prompt configuration
 │   │   ├── ai.rs                  # Gemini API integration
 │   │   └── characteristics.rs     # CodeCharacteristics struct
+│   ├── github/
+│   │   ├── mod.rs                 # GitHub module exports
+│   │   └── api.rs                 # GitHub API client (repos, commits)
 │   └── endpoints/
 │       ├── mod.rs                 # Endpoint exports
 │       ├── ep_add_to_db.rs        # Add candidate endpoint
 │       ├── ep_analyse_repo.rs     # Analyze repo endpoint
+│       ├── ep_analyse_github.rs   # Analyze GitHub user endpoint
 │       ├── ep_jobs.rs             # Jobs CRUD
 │       ├── ep_teams.rs            # Teams CRUD + members
 │       ├── ep_sourcing.rs         # Candidate sourcing (mock)

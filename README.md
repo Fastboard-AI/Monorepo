@@ -17,6 +17,7 @@ AI-powered talent matching platform with team compatibility analysis.
 - Docker & Docker Compose
 - Neon PostgreSQL database (or any PostgreSQL)
 - Google Gemini API key
+- GitHub Personal Access Token (classic, no scopes needed for public repos)
 - Clerk authentication keys
 
 ### 1. Configure Environment
@@ -25,6 +26,7 @@ AI-powered talent matching platform with team compatibility analysis.
 ```env
 GEMINI_API_KEY=your_gemini_api_key
 DATABASE_URL=postgresql://user:password@host/database?sslmode=require
+GITHUB_TOKEN=ghp_your_github_token
 ```
 
 **Frontend** (`frontend/.env.local`):
@@ -105,7 +107,8 @@ App runs at http://localhost:3000
 | DELETE | `/api/teams/:id/members/:mid` | Remove member |
 | POST | `/api/sourcing/search` | AI candidate sourcing |
 | POST | `/add_to_db` | Add candidate with code analysis |
-| POST | `/analyse_repo` | Analyze GitHub repo |
+| POST | `/analyse_repo` | Analyze GitHub repo (clones repo) |
+| POST | `/analyse_github` | Analyze GitHub user (via commits) |
 
 ---
 

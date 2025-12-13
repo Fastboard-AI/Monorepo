@@ -21,6 +21,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         .mount("/", routes![
             endpoints::add_to_db,
             endpoints::analyse_repo,
+            endpoints::analyse_github,
             // Jobs
             endpoints::get_jobs,
             endpoints::get_job,
