@@ -17,9 +17,8 @@ import {
 } from "lucide-react";
 
 import { Header } from "../components";
-import { useJobsStorage } from "../hooks/useJobsStorage";
-import { useTeamsStorage } from "../hooks/useTeamsStorage";
-import { mockCandidates } from "../data/mockCandidates";
+import { useJobs } from "../hooks/useJobs";
+import { useTeams } from "../hooks/useTeams";
 
 const statusColors: Record<string, string> = {
   sourcing: "bg-indigo-100 text-indigo-700",
@@ -30,8 +29,8 @@ const statusColors: Record<string, string> = {
 
 export default function DashboardPage() {
   const { isLoaded, isSignedIn } = useAuth();
-  const { jobs, isLoading: jobsLoading } = useJobsStorage();
-  const { teams, isLoading: teamsLoading } = useTeamsStorage();
+  const { jobs, isLoading: jobsLoading } = useJobs();
+  const { teams, isLoading: teamsLoading } = useTeams();
 
   // Calculate stats
   const stats = useMemo(() => {

@@ -1,10 +1,3 @@
-use std::error::Error;
-
-use rocket::{post, serde::json::{self, Json}};
-use rocket_db_pools::{Connection, sqlx::FromRow};
-use rocket_db_pools::sqlx;
-use serde::Deserialize;
-
 use crate::code_analysis::characteristics::CodeCharacteristics;
 
 //use crate::{code_analysis::characteristics::CodeCharacteristics, db::MainDatabase};

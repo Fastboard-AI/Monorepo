@@ -11,7 +11,7 @@ import { EditTeamModal } from "../../components/EditTeamModal";
 import { TeamDetailModal } from "../../components/TeamDetailModal";
 import { DeleteConfirmModal } from "../../components/DeleteConfirmModal";
 import { AddTeamMemberModal } from "../../components/AddTeamMemberModal";
-import { useTeamsStorage } from "../../hooks/useTeamsStorage";
+import { useTeams } from "../../hooks/useTeams";
 import type { Team, TeamMember } from "../../types";
 
 export default function TeamsPage() {
@@ -24,7 +24,7 @@ export default function TeamsPage() {
     deleteTeam,
     addTeamMember,
     removeTeamMember,
-  } = useTeamsStorage();
+  } = useTeams();
 
   // Modal states
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -70,8 +70,8 @@ export default function TeamsPage() {
 
   // Handlers
   const handleCreateTeam = useCallback(
-    (data: { name: string; targetRole?: string }) => {
-      createTeam(data);
+    async (data: { name: string; targetRole?: string }) => {
+      await createTeam(data);
     },
     [createTeam]
   );
@@ -82,8 +82,8 @@ export default function TeamsPage() {
   }, []);
 
   const handleSaveTeam = useCallback(
-    (teamId: string, updates: { name: string; targetRole?: string }) => {
-      updateTeam(teamId, updates);
+    async (teamId: string, updates: { name: string; targetRole?: string }) => {
+      await updateTeam(teamId, updates);
       setIsEditModalOpen(false);
       setSelectedTeam(null);
     },
@@ -95,9 +95,9 @@ export default function TeamsPage() {
     setIsDeleteModalOpen(true);
   }, []);
 
-  const handleConfirmDelete = useCallback(() => {
+  const handleConfirmDelete = useCallback(async () => {
     if (selectedTeam) {
-      deleteTeam(selectedTeam.id);
+      await deleteTeam(selectedTeam.id);
       setIsDeleteModalOpen(false);
       setSelectedTeam(null);
     }
@@ -114,9 +114,9 @@ export default function TeamsPage() {
   }, []);
 
   const handleAddMember = useCallback(
-    (memberData: Omit<TeamMember, "id">) => {
+    async (memberData: Omit<TeamMember, "id">) => {
       if (selectedTeam) {
-        addTeamMember(selectedTeam.id, memberData);
+        await addTeamMember(selectedTeam.id, memberData);
       }
       setIsAddMemberModalOpen(false);
     },
@@ -124,8 +124,8 @@ export default function TeamsPage() {
   );
 
   const handleRemoveMember = useCallback(
-    (teamId: string, memberId: string) => {
-      removeTeamMember(teamId, memberId);
+    async (teamId: string, memberId: string) => {
+      await removeTeamMember(teamId, memberId);
     },
     [removeTeamMember]
   );

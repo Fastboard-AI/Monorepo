@@ -20,6 +20,12 @@ export function Header() {
         <div className="flex items-center gap-4">
           <nav className="hidden items-center gap-1 md:flex">
             <Link
+              href="/dashboard"
+              className="rounded-lg px-3 py-2 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-900"
+            >
+              Dashboard
+            </Link>
+            <Link
               href="/dashboard/jobs"
               className="rounded-lg px-3 py-2 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-900"
             >

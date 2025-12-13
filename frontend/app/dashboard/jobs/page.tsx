@@ -19,7 +19,7 @@ import { CreateJobModal } from "../../components/CreateJobModal";
 import { EditJobModal } from "../../components/EditJobModal";
 import { DeleteConfirmModal } from "../../components/DeleteConfirmModal";
 import { SourceCandidatesModal } from "../../components/SourceCandidatesModal";
-import { useJobsStorage } from "../../hooks/useJobsStorage";
+import { useJobs } from "../../hooks/useJobs";
 import type { Job, ExperienceLevel, JobStatus } from "../../types";
 
 export default function JobsPage() {
@@ -32,7 +32,7 @@ export default function JobsPage() {
     updateJob,
     deleteJob,
     addCandidatesToJob,
-  } = useJobsStorage();
+  } = useJobs();
 
   // Modal states
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -76,14 +76,14 @@ export default function JobsPage() {
 
   // Handlers
   const handleCreateJob = useCallback(
-    (data: {
+    async (data: {
       title: string;
       description?: string;
       location?: string;
       requiredSkills?: string[];
       experienceLevel?: ExperienceLevel;
     }) => {
-      const newJob = createJob(data);
+      const newJob = await createJob(data);
       router.push(`/dashboard/jobs/${newJob.id}`);
     },
     [createJob, router]
@@ -95,7 +95,7 @@ export default function JobsPage() {
   }, []);
 
   const handleSaveJob = useCallback(
-    (
+    async (
       jobId: string,
       updates: {
         title?: string;
@@ -106,7 +106,7 @@ export default function JobsPage() {
         status?: JobStatus;
       }
     ) => {
-      updateJob(jobId, updates);
+      await updateJob(jobId, updates);
       setIsEditModalOpen(false);
       setSelectedJob(null);
     },
@@ -118,9 +118,9 @@ export default function JobsPage() {
     setIsDeleteModalOpen(true);
   }, []);
 
-  const handleConfirmDelete = useCallback(() => {
+  const handleConfirmDelete = useCallback(async () => {
     if (selectedJob) {
-      deleteJob(selectedJob.id);
+      await deleteJob(selectedJob.id);
       setIsDeleteModalOpen(false);
       setSelectedJob(null);
     }

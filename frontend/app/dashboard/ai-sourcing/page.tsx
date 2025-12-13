@@ -22,8 +22,8 @@ import {
   TeamMemberCard,
   CandidateDetailModal,
 } from "../../components";
-import { useJobsStorage } from "../../hooks/useJobsStorage";
-import { useTeamsStorage } from "../../hooks/useTeamsStorage";
+import { useJobs } from "../../hooks/useJobs";
+import { useTeams } from "../../hooks/useTeams";
 import type { Job, Team, TeamMember, Candidate, Skill } from "../../types";
 
 type SourceType = "linkedin" | "github" | "portfolio";
@@ -175,8 +175,8 @@ function generateSourcedCandidate(
 }
 
 export default function AISourcingPage() {
-  const { jobs, isLoading: isLoadingJobs } = useJobsStorage();
-  const { teams, isLoading: isLoadingTeams } = useTeamsStorage();
+  const { jobs, isLoading: isLoadingJobs } = useJobs();
+  const { teams, isLoading: isLoadingTeams } = useTeams();
 
   // Selection state
   const [selectedJob, setSelectedJob] = useState<Job | null>(null);

@@ -2,8 +2,8 @@
 
 import { useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { Plus, Briefcase, Users, ChevronRight } from "lucide-react";
-import { useJobsStorage } from "../hooks/useJobsStorage";
+import { Plus, Users, ChevronRight } from "lucide-react";
+import { useJobs } from "../hooks/useJobs";
 import { CreateJobModal } from "./CreateJobModal";
 import type { Job } from "../types";
 
@@ -17,7 +17,7 @@ const statusColors: Record<Job["status"], string> = {
 export function JobsNavBar() {
   const pathname = usePathname();
   const router = useRouter();
-  const { jobs, isLoading, createJob } = useJobsStorage();
+  const { jobs, isLoading, createJob } = useJobs();
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
 
   // Extract jobId from pathname if on a job detail page
@@ -29,14 +29,14 @@ export function JobsNavBar() {
     router.push(`/dashboard/jobs/${jobId}`);
   };
 
-  const handleCreateJob = (data: {
+  const handleCreateJob = async (data: {
     title: string;
     description?: string;
     location?: string;
     requiredSkills?: string[];
     experienceLevel?: Job["experienceLevel"];
   }) => {
-    const newJob = createJob(data);
+    const newJob = await createJob(data);
     router.push(`/dashboard/jobs/${newJob.id}`);
   };
 
@@ -58,12 +58,6 @@ export function JobsNavBar() {
       <div className="border-b border-slate-200 bg-slate-50">
         <div className="mx-auto max-w-7xl px-4 sm:px-6">
           <div className="flex h-12 items-center gap-2 overflow-x-auto scrollbar-hide">
-            {/* Jobs label */}
-            <div className="flex items-center gap-1.5 pr-2 text-sm font-medium text-slate-500">
-              <Briefcase className="h-4 w-4" />
-              <span className="hidden sm:inline">Jobs:</span>
-            </div>
-
             {/* Job tabs */}
             {jobs.length === 0 ? (
               <span className="text-sm text-slate-400">No jobs yet</span>

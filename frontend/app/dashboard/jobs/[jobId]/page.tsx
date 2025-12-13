@@ -26,8 +26,8 @@ import { EditJobModal } from "../../../components/EditJobModal";
 import { DeleteConfirmModal } from "../../../components/DeleteConfirmModal";
 import { SourceCandidatesModal } from "../../../components/SourceCandidatesModal";
 import { JobTeamPanel } from "../../../components/JobTeamPanel";
-import { useJobsStorage } from "../../../hooks/useJobsStorage";
-import { useTeamsStorage } from "../../../hooks/useTeamsStorage";
+import { useJobs } from "../../../hooks/useJobs";
+import { useTeams } from "../../../hooks/useTeams";
 import { mockCandidates } from "../../../data/mockCandidates";
 import type { Candidate, Job, Team, ExperienceLevel, JobStatus } from "../../../types";
 
@@ -74,13 +74,13 @@ export default function JobDetailPage() {
     getJobById,
     linkTeamToJob,
     unlinkTeamFromJob,
-  } = useJobsStorage();
+  } = useJobs();
 
   const {
     teams,
     isLoading: teamsLoading,
     getTeamById,
-  } = useTeamsStorage();
+  } = useTeams();
 
   const job = getJobById(jobId);
   const linkedTeam = job?.teamId ? getTeamById(job.teamId) ?? null : null;
@@ -135,7 +135,7 @@ export default function JobDetailPage() {
 
   // Job action handlers
   const handleSaveJob = useCallback(
-    (
+    async (
       id: string,
       updates: {
         title?: string;
@@ -146,14 +146,14 @@ export default function JobDetailPage() {
         status?: JobStatus;
       }
     ) => {
-      updateJob(id, updates);
+      await updateJob(id, updates);
       setIsEditModalOpen(false);
     },
     [updateJob]
   );
 
-  const handleConfirmDelete = useCallback(() => {
-    deleteJob(jobId);
+  const handleConfirmDelete = useCallback(async () => {
+    await deleteJob(jobId);
     router.push("/dashboard/jobs");
   }, [deleteJob, jobId, router]);
 
@@ -186,18 +186,18 @@ export default function JobDetailPage() {
 
   // Team handlers
   const handleSelectTeam = useCallback(
-    (team: Team | null) => {
+    async (team: Team | null) => {
       if (team) {
-        linkTeamToJob(jobId, team.id);
+        await linkTeamToJob(jobId, team.id);
       } else {
-        unlinkTeamFromJob(jobId);
+        await unlinkTeamFromJob(jobId);
       }
     },
     [jobId, linkTeamToJob, unlinkTeamFromJob]
   );
 
-  const handleUnlinkTeam = useCallback(() => {
-    unlinkTeamFromJob(jobId);
+  const handleUnlinkTeam = useCallback(async () => {
+    await unlinkTeamFromJob(jobId);
   }, [jobId, unlinkTeamFromJob]);
 
   if (!isLoaded || isLoading || teamsLoading) {
