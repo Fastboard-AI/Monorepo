@@ -1,7 +1,7 @@
 "use client";
 
 import { UserButton } from "@clerk/nextjs";
-import { Zap } from "lucide-react";
+import { Rocket } from "lucide-react";
 import Link from "next/link";
 
 export function Header() {
@@ -10,7 +10,7 @@ export function Header() {
       <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6">
         <Link href="/dashboard" className="flex items-center gap-2.5">
           <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-500 to-violet-500">
-            <Zap className="h-5 w-5 text-white" />
+            <Rocket className="h-5 w-5 text-white" />
           </div>
           <span className="text-xl font-bold text-slate-900">
             Fastboard<span className="gradient-text">AI</span>

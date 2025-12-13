@@ -8,6 +8,7 @@ import {
   ChevronRight,
   Loader2,
   ExternalLink,
+  GitCompare,
 } from "lucide-react";
 import Link from "next/link";
 import {
@@ -202,7 +203,7 @@ export default function ResumeMatcherPage() {
         <div className="mb-8 animate-fade-in">
           <div className="flex items-center gap-3">
             <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-indigo-600">
-              <Sparkles className="h-5 w-5 text-white" />
+              <GitCompare className="h-5 w-5 text-white" />
             </div>
             <div>
               <h1 className="text-xl font-semibold text-slate-900">

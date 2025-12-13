@@ -5,7 +5,7 @@ import {
   Briefcase,
   Users,
   Sparkles,
-  Search,
+  Radar,
   Loader2,
   ExternalLink,
   Linkedin,
@@ -249,7 +249,7 @@ export default function AISourcingPage() {
         <div className="mb-8 animate-fade-in">
           <div className="flex items-center gap-3">
             <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-indigo-600">
-              <Search className="h-5 w-5 text-white" />
+              <Radar className="h-5 w-5 text-white" />
             </div>
             <div>
               <h1 className="text-xl font-semibold text-slate-900">
@@ -439,7 +439,7 @@ export default function AISourcingPage() {
                   </>
                 ) : (
                   <>
-                    <Search className="h-4 w-4" />
+                    <Radar className="h-4 w-4" />
                     Start Sourcing
                   </>
                 )}
