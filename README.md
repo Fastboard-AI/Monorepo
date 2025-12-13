@@ -7,6 +7,7 @@ AI-powered talent matching platform with team compatibility analysis.
 ```
 ├── backend/     # Rust API (Rocket + PostgreSQL + Gemini AI)
 ├── frontend/    # Next.js 16 (React 19 + Tailwind + Clerk Auth)
+├── scraping/    # Python scraping service (FastAPI + Playwright)
 └── docker-compose.yml
 ```
 
@@ -87,6 +88,22 @@ pnpm dev
 
 App runs at http://localhost:3000
 
+### Scraping Service
+
+```bash
+cd scraping
+uv sync
+uv run playwright install chromium
+
+# Search-only mode
+uv run uvicorn scraping.main:app --reload --port 8001
+
+# With browser for profile scraping
+uv run python -m scraping.main --with-browser
+```
+
+Service runs at http://localhost:8001
+
 ---
 
 ## API Endpoints
@@ -129,6 +146,12 @@ App runs at http://localhost:3000
 - React 19
 - Tailwind CSS 4
 - Clerk Authentication
+
+**Scraping**
+- Python 3.11
+- FastAPI
+- Playwright
+- DuckDuckGo Search
 
 ---
 
