@@ -7,15 +7,13 @@ use std::{
 
 use genai::{
     Client,
-    chat::{ChatMessage, ChatOptions, ChatRequest, Tool, ToolCall},
+    chat::{ChatMessage, ChatOptions, ChatRequest},
 };
-use git2::Repository;
 use walkdir::WalkDir;
 
 use crate::code_analysis::characteristics::CodeCharacteristics;
 
 const MODEL_GEMINI: &str = "gemini-2.0-flash";
-const MODEL_OPENAI: &str = "gpt-5";
 
 pub async fn generate_characteristics_from_repo(
     url: &str,

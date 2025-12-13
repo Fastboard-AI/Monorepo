@@ -6,7 +6,6 @@ edition = "2024"
 [dependencies]
 dotenv = "0.15.0"
 genai = "0.4.4"
-git2 = { version = "0.20.3", features = ["https", "ssh"] }
 openssl = "0.10.75"
 postgres = "0.19.12"
 postgres-openssl = "0.5.2"
