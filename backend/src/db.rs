@@ -1,9 +1,11 @@
 use std::sync::Mutex;
 
+use rocket_db_pools::{Database, sqlx};
+
 use crate::code_analysis::characteristics::CodeCharacteristics;
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
-pub struct Database {
+pub struct InMemoryDatabase {
     pub candidates: Mutex<Vec<Candidate>>
 }
 
@@ -18,12 +20,12 @@ pub struct Candidate {
     pub stacks: Vec<String>
 }
 
-impl Database {
-    pub fn new() -> Database {
+impl InMemoryDatabase {
+    pub fn new() -> InMemoryDatabase {
         Self { candidates: Mutex::new(Vec::new()) }
     }
 }
 
-impl Candidate {
-
-}
+#[derive(Database)]
+#[database("main")]
+pub struct MainDatabase(sqlx::PgPool);
