@@ -1,5 +1,6 @@
-import { SignInButton, SignUpButton } from "@clerk/nextjs";
+import { SignInButton, SignUpButton, SignedIn, SignedOut } from "@clerk/nextjs";
 import { Zap, Users, Target, TrendingUp, ArrowRight } from "lucide-react";
+import Link from "next/link";
 
 export default function Home() {
   return (
@@ -22,16 +23,26 @@ export default function Home() {
             </span>
           </div>
           <div className="flex items-center gap-3">
-            <SignInButton mode="modal" forceRedirectUrl="/dashboard">
-              <button className="rounded-lg px-4 py-2 text-sm font-medium text-slate-600 transition-colors hover:text-slate-900">
-                Sign In
-              </button>
-            </SignInButton>
-            <SignUpButton mode="modal" forceRedirectUrl="/dashboard">
-              <button className="btn-lift rounded-full gradient-bg px-5 py-2.5 text-sm font-semibold text-white shadow-button">
-                Get Started
-              </button>
-            </SignUpButton>
+            <SignedIn>
+              <Link
+                href="/dashboard"
+                className="btn-lift rounded-full gradient-bg px-5 py-2.5 text-sm font-semibold text-white shadow-button"
+              >
+                Dashboard
+              </Link>
+            </SignedIn>
+            <SignedOut>
+              <SignInButton mode="modal" forceRedirectUrl="/dashboard">
+                <button className="rounded-lg px-4 py-2 text-sm font-medium text-slate-600 transition-colors hover:text-slate-900">
+                  Sign In
+                </button>
+              </SignInButton>
+              <SignUpButton mode="modal" forceRedirectUrl="/dashboard">
+                <button className="btn-lift rounded-full gradient-bg px-5 py-2.5 text-sm font-semibold text-white shadow-button">
+                  Get Started
+                </button>
+              </SignUpButton>
+            </SignedOut>
           </div>
         </div>
       </header>
@@ -54,12 +65,23 @@ export default function Home() {
               guesswork.
             </p>
             <div className="mt-10 flex flex-col items-center gap-4 sm:flex-row sm:justify-center">
-              <SignUpButton mode="modal" forceRedirectUrl="/dashboard">
-                <button className="btn-lift flex items-center gap-2 rounded-full gradient-bg px-8 py-4 text-base font-semibold text-white shadow-button">
-                  Start Matching
+              <SignedIn>
+                <Link
+                  href="/dashboard"
+                  className="btn-lift flex items-center gap-2 rounded-full gradient-bg px-8 py-4 text-base font-semibold text-white shadow-button"
+                >
+                  Go to Dashboard
                   <ArrowRight className="h-5 w-5" />
-                </button>
-              </SignUpButton>
+                </Link>
+              </SignedIn>
+              <SignedOut>
+                <SignUpButton mode="modal" forceRedirectUrl="/dashboard">
+                  <button className="btn-lift flex items-center gap-2 rounded-full gradient-bg px-8 py-4 text-base font-semibold text-white shadow-button">
+                    Start Matching
+                    <ArrowRight className="h-5 w-5" />
+                  </button>
+                </SignUpButton>
+              </SignedOut>
               <button className="flex items-center gap-2 rounded-full border border-slate-200 bg-white px-8 py-4 text-base font-semibold text-slate-700 transition-colors hover:border-slate-300 hover:bg-slate-50">
                 Watch Demo
               </button>
@@ -132,11 +154,21 @@ export default function Home() {
               Join hundreds of startups using FastboardAI to make smarter hiring
               decisions and build high-performing teams.
             </p>
-            <SignUpButton mode="modal" forceRedirectUrl="/dashboard">
-              <button className="btn-lift mt-8 rounded-full bg-white px-8 py-4 text-base font-semibold text-indigo-900 shadow-lg transition-all hover:bg-slate-50">
-                Get Started Free
-              </button>
-            </SignUpButton>
+            <SignedIn>
+              <Link
+                href="/dashboard"
+                className="btn-lift mt-8 inline-block rounded-full bg-white px-8 py-4 text-base font-semibold text-indigo-900 shadow-lg transition-all hover:bg-slate-50"
+              >
+                Go to Dashboard
+              </Link>
+            </SignedIn>
+            <SignedOut>
+              <SignUpButton mode="modal" forceRedirectUrl="/dashboard">
+                <button className="btn-lift mt-8 rounded-full bg-white px-8 py-4 text-base font-semibold text-indigo-900 shadow-lg transition-all hover:bg-slate-50">
+                  Get Started Free
+                </button>
+              </SignUpButton>
+            </SignedOut>
           </div>
         </section>
 
