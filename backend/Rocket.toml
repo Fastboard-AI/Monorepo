@@ -1,2 +1,0 @@
-[default.databases.main]
-url = "postgresql://neondb_owner:npg_8a2gJNytlBXr@ep-jolly-cell-a7je5l6q-pooler.ap-southeast-2.aws.neon.tech/neondb?sslmode=require&channel_binding=require"
