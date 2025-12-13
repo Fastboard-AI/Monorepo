@@ -199,16 +199,16 @@ export default function ResumeMatcherPage() {
 
       <main className="mx-auto max-w-5xl px-4 py-8 sm:px-6">
         {/* Page Header */}
-        <div className="mb-8">
+        <div className="mb-8 animate-fade-in">
           <div className="flex items-center gap-3">
-            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-500 to-violet-500">
-              <Sparkles className="h-6 w-6 text-white" />
+            <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-indigo-600">
+              <Sparkles className="h-5 w-5 text-white" />
             </div>
             <div>
-              <h1 className="text-2xl font-bold text-slate-900">
+              <h1 className="text-xl font-semibold text-slate-900">
                 Resume Matcher
               </h1>
-              <p className="text-slate-500">
+              <p className="text-sm text-slate-500">
                 Match candidates against job requirements and team compatibility
               </p>
             </div>
@@ -327,12 +327,12 @@ export default function ResumeMatcherPage() {
                 <button
                   onClick={handleMatchResumes}
                   disabled={!canMatch}
-                  className="btn-lift flex items-center gap-2 rounded-full gradient-bg px-8 py-3 text-base font-semibold text-white shadow-button disabled:cursor-not-allowed disabled:opacity-50"
+                  className="flex items-center gap-2 rounded-lg bg-indigo-600 px-6 py-2.5 text-sm font-medium text-white transition-colors hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
                 >
-                  <Sparkles className="h-5 w-5" />
+                  <Sparkles className="h-4 w-4" />
                   Match {selectedFiles.length} Resume
                   {selectedFiles.length !== 1 ? "s" : ""}
-                  <ChevronRight className="h-5 w-5" />
+                  <ChevronRight className="h-4 w-4" />
                 </button>
               </div>
             )}
@@ -340,13 +340,13 @@ export default function ResumeMatcherPage() {
 
           {/* Results */}
           {(matchedResults.length > 0 || isProcessing) && (
-            <section className="rounded-2xl border border-slate-100 bg-white p-6 shadow-card">
+            <section className="rounded-xl border border-slate-200 bg-white p-6">
               <div className="mb-4 flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-indigo-500 to-violet-500">
+                  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-600">
                     <Sparkles className="h-4 w-4 text-white" />
                   </div>
-                  <h2 className="text-lg font-semibold text-slate-900">
+                  <h2 className="text-base font-semibold text-slate-900">
                     Matched Candidates
                   </h2>
                 </div>

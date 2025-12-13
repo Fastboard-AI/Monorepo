@@ -25,15 +25,15 @@ export function JobTeamPanel({
   onUnlinkTeam,
 }: JobTeamPanelProps) {
   return (
-    <div className="rounded-xl border border-slate-100 bg-white p-5 shadow-card">
+    <div className="rounded-xl border border-slate-200 bg-white p-5">
       {/* Header */}
       <div className="mb-4 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-500 to-violet-500 shadow-sm">
+          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-indigo-600">
             <Users className="h-5 w-5 text-white" />
           </div>
           <div>
-            <h3 className="text-lg font-semibold text-slate-900">Team</h3>
+            <h3 className="text-base font-semibold text-slate-900">Team</h3>
             <p className="text-sm text-slate-500">
               Select a team for compatibility matching
             </p>

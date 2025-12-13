@@ -102,17 +102,17 @@ export default function DashboardPage() {
 
       <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
         {/* Welcome Section */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold tracking-tight text-slate-900">
-            Welcome to <span className="gradient-text">FastboardAI</span>
+        <div className="mb-8 animate-fade-in">
+          <h1 className="text-2xl font-semibold tracking-tight text-slate-900">
+            Welcome back
           </h1>
-          <p className="mt-2 text-slate-600">
-            Build your dream team with AI-powered candidate matching.
+          <p className="mt-1 text-slate-500">
+            Here's what's happening with your hiring pipeline.
           </p>
         </div>
 
         {/* Stats Grid */}
-        <div className="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4 stagger-children">
           <div className="card-lift rounded-xl border border-slate-100 bg-white p-5 shadow-card">
             <div className="flex items-center justify-between">
               <div>
@@ -180,19 +180,19 @@ export default function DashboardPage() {
 
         {/* Quick Actions */}
         <div className="mb-8">
-          <h2 className="mb-4 text-lg font-semibold text-slate-900">
+          <h2 className="mb-4 text-base font-semibold text-slate-900">
             Quick Actions
           </h2>
           <div className="grid gap-4 sm:grid-cols-3">
             <Link
               href="/dashboard/jobs"
-              className="group flex items-center gap-4 rounded-xl border border-slate-100 bg-white p-5 shadow-card transition-all hover:border-indigo-200 hover:shadow-md"
+              className="group flex items-center gap-4 rounded-xl border border-slate-200 bg-white p-5 transition-all hover:border-indigo-300 hover:shadow-sm"
             >
-              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-500 to-violet-500">
-                <Plus className="h-6 w-6 text-white" />
+              <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-indigo-600">
+                <Plus className="h-5 w-5 text-white" />
               </div>
               <div className="flex-1">
-                <p className="font-semibold text-slate-900">Create Job</p>
+                <p className="font-medium text-slate-900">Create Job</p>
                 <p className="text-sm text-slate-500">Post a new position</p>
               </div>
               <ArrowRight className="h-5 w-5 text-slate-300 transition-transform group-hover:translate-x-1 group-hover:text-indigo-500" />
@@ -200,30 +200,30 @@ export default function DashboardPage() {
 
             <Link
               href="/dashboard/resume-matcher"
-              className="group flex items-center gap-4 rounded-xl border border-slate-100 bg-white p-5 shadow-card transition-all hover:border-violet-200 hover:shadow-md"
+              className="group flex items-center gap-4 rounded-xl border border-slate-200 bg-white p-5 transition-all hover:border-indigo-300 hover:shadow-sm"
             >
-              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-violet-500 to-purple-500">
-                <Sparkles className="h-6 w-6 text-white" />
+              <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-indigo-600">
+                <Sparkles className="h-5 w-5 text-white" />
               </div>
               <div className="flex-1">
-                <p className="font-semibold text-slate-900">Match Resumes</p>
+                <p className="font-medium text-slate-900">Match Resumes</p>
                 <p className="text-sm text-slate-500">AI-powered matching</p>
               </div>
-              <ArrowRight className="h-5 w-5 text-slate-300 transition-transform group-hover:translate-x-1 group-hover:text-violet-500" />
+              <ArrowRight className="h-5 w-5 text-slate-300 transition-transform group-hover:translate-x-1 group-hover:text-indigo-500" />
             </Link>
 
             <Link
               href="/dashboard/teams"
-              className="group flex items-center gap-4 rounded-xl border border-slate-100 bg-white p-5 shadow-card transition-all hover:border-emerald-200 hover:shadow-md"
+              className="group flex items-center gap-4 rounded-xl border border-slate-200 bg-white p-5 transition-all hover:border-indigo-300 hover:shadow-sm"
             >
-              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-500 to-teal-500">
-                <Users className="h-6 w-6 text-white" />
+              <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-indigo-600">
+                <Users className="h-5 w-5 text-white" />
               </div>
               <div className="flex-1">
-                <p className="font-semibold text-slate-900">Manage Teams</p>
+                <p className="font-medium text-slate-900">Manage Teams</p>
                 <p className="text-sm text-slate-500">Build your team</p>
               </div>
-              <ArrowRight className="h-5 w-5 text-slate-300 transition-transform group-hover:translate-x-1 group-hover:text-emerald-500" />
+              <ArrowRight className="h-5 w-5 text-slate-300 transition-transform group-hover:translate-x-1 group-hover:text-indigo-500" />
             </Link>
           </div>
         </div>
@@ -233,7 +233,7 @@ export default function DashboardPage() {
           {/* Recent Jobs */}
           <div className="lg:col-span-2">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-semibold text-slate-900">
+              <h2 className="text-base font-semibold text-slate-900">
                 Recent Jobs
               </h2>
               <Link
@@ -361,7 +361,7 @@ export default function DashboardPage() {
                         {team.members.slice(0, 4).map((member) => (
                           <div
                             key={member.id}
-                            className="flex h-7 w-7 items-center justify-center rounded-full border-2 border-white bg-gradient-to-br from-indigo-400 to-violet-400 text-xs font-medium text-white"
+                            className="flex h-7 w-7 items-center justify-center rounded-full border-2 border-white bg-indigo-600 text-xs font-medium text-white"
                             title={member.name}
                           >
                             {member.name
@@ -384,21 +384,21 @@ export default function DashboardPage() {
             )}
 
             {/* Getting Started Card */}
-            <div className="mt-6 rounded-xl bg-gradient-to-br from-indigo-500 to-violet-500 p-5 text-white">
+            <div className="mt-6 rounded-xl border border-indigo-100 bg-indigo-50 p-5">
               <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-white/20">
-                  <Zap className="h-5 w-5" />
+                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-indigo-600">
+                  <Zap className="h-5 w-5 text-white" />
                 </div>
                 <div>
-                  <p className="font-semibold">Pro Tip</p>
-                  <p className="text-sm text-indigo-100">
-                    Use Resume Matcher for bulk candidate screening
+                  <p className="font-semibold text-slate-900">Pro Tip</p>
+                  <p className="text-sm text-slate-600">
+                    Use Resume Matcher for bulk screening
                   </p>
                 </div>
               </div>
               <Link
                 href="/dashboard/resume-matcher"
-                className="mt-4 flex items-center justify-center gap-2 rounded-lg bg-white/20 px-4 py-2 text-sm font-medium transition-colors hover:bg-white/30"
+                className="mt-4 flex items-center justify-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-indigo-700"
               >
                 <Sparkles className="h-4 w-4" />
                 Try Resume Matcher
