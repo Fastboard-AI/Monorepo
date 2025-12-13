@@ -4,31 +4,24 @@ import { useState, useCallback } from "react";
 import {
   Briefcase,
   Users,
-  Upload,
   Sparkles,
-  Plus,
   ChevronRight,
-  X,
-  UserPlus,
   Loader2,
+  ExternalLink,
 } from "lucide-react";
+import Link from "next/link";
 import {
   Header,
   JobSelector,
+  TeamSelector,
   FileUpload,
   MatchedCandidateCard,
   TeamMemberCard,
   CandidateDetailModal,
 } from "../../components";
 import { useJobsStorage } from "../../hooks/useJobsStorage";
-import type {
-  Job,
-  TeamMember,
-  Candidate,
-  Skill,
-  ExperienceLevel,
-  WorkStyle,
-} from "../../types";
+import { useTeamsStorage } from "../../hooks/useTeamsStorage";
+import type { Job, Team, TeamMember, Candidate, Skill } from "../../types";
 
 // Mock candidate generation for demonstration
 function generateMockCandidate(
@@ -101,7 +94,9 @@ function generateMockCandidate(
   // Calculate team compatibility score
   let teamScore = 75;
   if (teamMembers.length > 0) {
-    const teamSkills = new Set(teamMembers.flatMap((m) => m.skills.map((s) => s.name)));
+    const teamSkills = new Set(
+      teamMembers.flatMap((m) => m.skills.map((s) => s.name))
+    );
     const complementarySkills = candidateSkillNames.filter(
       (s) => !teamSkills.has(s)
     );
@@ -147,26 +142,13 @@ function generateMockCandidate(
   return { candidate, jobScore, teamScore };
 }
 
-const EXPERIENCE_LEVELS: { value: ExperienceLevel; label: string }[] = [
-  { value: "entry", label: "Entry Level" },
-  { value: "mid", label: "Mid Level" },
-  { value: "senior", label: "Senior" },
-  { value: "lead", label: "Lead / Principal" },
-];
-
-const SKILL_LEVELS: Skill["level"][] = [
-  "beginner",
-  "intermediate",
-  "advanced",
-  "expert",
-];
-
 export default function ResumeMatcherPage() {
   const { jobs, isLoading: isLoadingJobs } = useJobsStorage();
+  const { teams, isLoading: isLoadingTeams } = useTeamsStorage();
 
   // Step state
   const [selectedJob, setSelectedJob] = useState<Job | null>(null);
-  const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
+  const [selectedTeam, setSelectedTeam] = useState<Team | null>(null);
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [matchedResults, setMatchedResults] = useState<
@@ -174,24 +156,9 @@ export default function ResumeMatcherPage() {
   >([]);
 
   // Modal states
-  const [showAddMemberModal, setShowAddMemberModal] = useState(false);
   const [selectedCandidate, setSelectedCandidate] = useState<Candidate | null>(
     null
   );
-
-  // Add member form state
-  const [memberName, setMemberName] = useState("");
-  const [memberRole, setMemberRole] = useState("");
-  const [memberExpLevel, setMemberExpLevel] = useState<ExperienceLevel>("mid");
-  const [memberSkills, setMemberSkills] = useState<Skill[]>([]);
-  const [newSkillName, setNewSkillName] = useState("");
-  const [newSkillLevel, setNewSkillLevel] =
-    useState<Skill["level"]>("intermediate");
-  const [memberWorkStyle, setMemberWorkStyle] = useState<WorkStyle>({
-    communication: "mixed",
-    collaboration: "balanced",
-    pace: "flexible",
-  });
 
   const handleFilesSelected = useCallback((files: File[]) => {
     setSelectedFiles(files);
@@ -208,6 +175,7 @@ export default function ResumeMatcherPage() {
     await new Promise((resolve) => setTimeout(resolve, 2000));
 
     // Generate mock candidates for each file
+    const teamMembers = selectedTeam?.members || [];
     const results = selectedFiles.map((file) =>
       generateMockCandidate(file.name, selectedJob, teamMembers)
     );
@@ -221,63 +189,7 @@ export default function ResumeMatcherPage() {
 
     setMatchedResults(results);
     setIsProcessing(false);
-  }, [selectedJob, selectedFiles, teamMembers]);
-
-  const handleAddMember = useCallback(() => {
-    if (!memberName.trim() || !memberRole.trim()) return;
-
-    const newMember: TeamMember = {
-      id: Math.random().toString(36).substring(2, 9),
-      name: memberName.trim(),
-      role: memberRole.trim(),
-      skills: memberSkills,
-      experienceLevel: memberExpLevel,
-      workStyle: memberWorkStyle,
-    };
-
-    setTeamMembers((prev) => [...prev, newMember]);
-
-    // Reset form
-    setMemberName("");
-    setMemberRole("");
-    setMemberExpLevel("mid");
-    setMemberSkills([]);
-    setNewSkillName("");
-    setNewSkillLevel("intermediate");
-    setMemberWorkStyle({
-      communication: "mixed",
-      collaboration: "balanced",
-      pace: "flexible",
-    });
-    setShowAddMemberModal(false);
-    setMatchedResults([]); // Clear results when team changes
-  }, [memberName, memberRole, memberSkills, memberExpLevel, memberWorkStyle]);
-
-  const handleRemoveMember = useCallback((memberId: string) => {
-    setTeamMembers((prev) => prev.filter((m) => m.id !== memberId));
-    setMatchedResults([]); // Clear results when team changes
-  }, []);
-
-  const handleAddSkill = useCallback(() => {
-    if (!newSkillName.trim()) return;
-    if (
-      memberSkills.some(
-        (s) => s.name.toLowerCase() === newSkillName.toLowerCase()
-      )
-    )
-      return;
-
-    setMemberSkills((prev) => [
-      ...prev,
-      { name: newSkillName.trim(), level: newSkillLevel },
-    ]);
-    setNewSkillName("");
-    setNewSkillLevel("intermediate");
-  }, [newSkillName, newSkillLevel, memberSkills]);
-
-  const handleRemoveSkill = useCallback((skillName: string) => {
-    setMemberSkills((prev) => prev.filter((s) => s.name !== skillName));
-  }, []);
+  }, [selectedJob, selectedFiles, selectedTeam]);
 
   const canMatch = selectedJob && selectedFiles.length > 0;
 
@@ -344,7 +256,7 @@ export default function ResumeMatcherPage() {
             )}
           </section>
 
-          {/* Step 2: Define Team */}
+          {/* Step 2: Select Team */}
           <section className="rounded-2xl border border-slate-100 bg-white p-6 shadow-card">
             <div className="mb-4 flex items-center justify-between">
               <div className="flex items-center gap-3">
@@ -353,41 +265,43 @@ export default function ResumeMatcherPage() {
                 </div>
                 <div>
                   <h2 className="text-lg font-semibold text-slate-900">
-                    Define Team
+                    Select Team
                   </h2>
                   <p className="text-sm text-slate-500">
-                    Who will this person work with? (Optional)
+                    Which team will this person join? (Optional)
                   </p>
                 </div>
               </div>
-              <button
-                onClick={() => setShowAddMemberModal(true)}
-                className="flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-50 hover:text-slate-900"
+              <Link
+                href="/dashboard/teams"
+                className="flex items-center gap-1.5 text-sm font-medium text-indigo-600 hover:text-indigo-700"
               >
-                <Plus className="h-4 w-4" />
-                Add Member
-              </button>
+                Manage Teams
+                <ExternalLink className="h-3.5 w-3.5" />
+              </Link>
             </div>
 
-            {teamMembers.length === 0 ? (
-              <div className="rounded-xl border-2 border-dashed border-slate-200 bg-slate-50 py-8 text-center">
-                <Users className="mx-auto h-10 w-10 text-slate-300" />
-                <p className="mt-2 font-medium text-slate-500">
-                  No team members yet
+            <TeamSelector
+              teams={teams}
+              selectedTeamId={selectedTeam?.id || null}
+              onSelect={(team) => {
+                setSelectedTeam(team);
+                setMatchedResults([]);
+              }}
+              isLoading={isLoadingTeams}
+            />
+
+            {/* Show selected team members */}
+            {selectedTeam && selectedTeam.members.length > 0 && (
+              <div className="mt-4">
+                <p className="mb-3 text-sm font-medium text-slate-700">
+                  Team Members ({selectedTeam.members.length})
                 </p>
-                <p className="mt-1 text-sm text-slate-400">
-                  Add existing employees to calculate team compatibility
-                </p>
-              </div>
-            ) : (
-              <div className="grid gap-3 sm:grid-cols-2">
-                {teamMembers.map((member) => (
-                  <TeamMemberCard
-                    key={member.id}
-                    member={member}
-                    onRemove={() => handleRemoveMember(member.id)}
-                  />
-                ))}
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {selectedTeam.members.map((member) => (
+                    <TeamMemberCard key={member.id} member={member} compact />
+                  ))}
+                </div>
               </div>
             )}
           </section>
@@ -471,269 +385,6 @@ export default function ResumeMatcherPage() {
           )}
         </div>
       </main>
-
-      {/* Add Member Modal */}
-      {showAddMemberModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div
-            className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm"
-            onClick={() => setShowAddMemberModal(false)}
-          />
-          <div className="relative flex max-h-[90vh] w-full max-w-lg flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
-            {/* Header */}
-            <div className="flex items-center justify-between border-b border-slate-100 p-6">
-              <div className="flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-500 to-violet-500">
-                  <UserPlus className="h-5 w-5 text-white" />
-                </div>
-                <div>
-                  <h2 className="text-lg font-semibold text-slate-900">
-                    Add Team Member
-                  </h2>
-                  <p className="text-sm text-slate-500">
-                    Add an existing employee for compatibility matching
-                  </p>
-                </div>
-              </div>
-              <button
-                onClick={() => setShowAddMemberModal(false)}
-                className="rounded-lg p-2 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600"
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-
-            {/* Form */}
-            <div className="flex-1 space-y-5 overflow-y-auto p-6">
-              {/* Name */}
-              <div>
-                <label
-                  htmlFor="member-name"
-                  className="block text-sm font-medium text-slate-700"
-                >
-                  Name <span className="text-red-500">*</span>
-                </label>
-                <input
-                  id="member-name"
-                  type="text"
-                  value={memberName}
-                  onChange={(e) => setMemberName(e.target.value)}
-                  placeholder="e.g., Sarah Chen"
-                  className="mt-1.5 w-full rounded-lg border border-slate-200 px-4 py-2.5 text-slate-900 placeholder:text-slate-400 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
-                  autoFocus
-                />
-              </div>
-
-              {/* Role */}
-              <div>
-                <label
-                  htmlFor="member-role"
-                  className="block text-sm font-medium text-slate-700"
-                >
-                  Current Role <span className="text-red-500">*</span>
-                </label>
-                <input
-                  id="member-role"
-                  type="text"
-                  value={memberRole}
-                  onChange={(e) => setMemberRole(e.target.value)}
-                  placeholder="e.g., Senior Frontend Developer"
-                  className="mt-1.5 w-full rounded-lg border border-slate-200 px-4 py-2.5 text-slate-900 placeholder:text-slate-400 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
-                />
-              </div>
-
-              {/* Experience Level */}
-              <div>
-                <label
-                  htmlFor="experience-level"
-                  className="block text-sm font-medium text-slate-700"
-                >
-                  Experience Level
-                </label>
-                <select
-                  id="experience-level"
-                  value={memberExpLevel}
-                  onChange={(e) =>
-                    setMemberExpLevel(e.target.value as ExperienceLevel)
-                  }
-                  className="mt-1.5 w-full rounded-lg border border-slate-200 px-4 py-2.5 text-slate-900 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
-                >
-                  {EXPERIENCE_LEVELS.map((level) => (
-                    <option key={level.value} value={level.value}>
-                      {level.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Skills */}
-              <div>
-                <label className="block text-sm font-medium text-slate-700">
-                  Skills
-                </label>
-                <div className="mt-1.5 flex gap-2">
-                  <input
-                    type="text"
-                    value={newSkillName}
-                    onChange={(e) => setNewSkillName(e.target.value)}
-                    placeholder="Skill name"
-                    className="flex-1 rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-900 placeholder:text-slate-400 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") {
-                        e.preventDefault();
-                        handleAddSkill();
-                      }
-                    }}
-                  />
-                  <select
-                    value={newSkillLevel}
-                    onChange={(e) =>
-                      setNewSkillLevel(e.target.value as Skill["level"])
-                    }
-                    className="rounded-lg border border-slate-200 px-2 py-2 text-sm text-slate-900 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
-                  >
-                    {SKILL_LEVELS.map((level) => (
-                      <option key={level} value={level}>
-                        {level.charAt(0).toUpperCase() + level.slice(1)}
-                      </option>
-                    ))}
-                  </select>
-                  <button
-                    type="button"
-                    onClick={handleAddSkill}
-                    className="rounded-lg bg-slate-100 px-3 py-2 text-slate-600 transition-colors hover:bg-slate-200"
-                  >
-                    <Plus className="h-4 w-4" />
-                  </button>
-                </div>
-                {memberSkills.length > 0 && (
-                  <div className="mt-2 flex flex-wrap gap-2">
-                    {memberSkills.map((skill) => (
-                      <span
-                        key={skill.name}
-                        className="group flex items-center gap-1.5 rounded-full bg-indigo-50 px-3 py-1 text-sm text-indigo-700"
-                      >
-                        {skill.name}
-                        <span className="text-indigo-400">({skill.level})</span>
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveSkill(skill.name)}
-                          className="rounded-full p-0.5 text-indigo-400 hover:bg-indigo-100 hover:text-indigo-600"
-                        >
-                          <X className="h-3 w-3" />
-                        </button>
-                      </span>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              {/* Work Style */}
-              <div className="space-y-4 rounded-xl border border-slate-200 bg-slate-50 p-4">
-                <h3 className="text-sm font-medium text-slate-700">
-                  Work Style Preferences
-                </h3>
-
-                <div>
-                  <label
-                    htmlFor="communication"
-                    className="block text-xs font-medium text-slate-600"
-                  >
-                    Communication Style
-                  </label>
-                  <select
-                    id="communication"
-                    value={memberWorkStyle.communication}
-                    onChange={(e) =>
-                      setMemberWorkStyle((prev) => ({
-                        ...prev,
-                        communication: e.target
-                          .value as WorkStyle["communication"],
-                      }))
-                    }
-                    className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
-                  >
-                    <option value="async">Async (email, messages)</option>
-                    <option value="sync">Sync (calls, meetings)</option>
-                    <option value="mixed">Mixed (flexible)</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label
-                    htmlFor="collaboration"
-                    className="block text-xs font-medium text-slate-600"
-                  >
-                    Collaboration Style
-                  </label>
-                  <select
-                    id="collaboration"
-                    value={memberWorkStyle.collaboration}
-                    onChange={(e) =>
-                      setMemberWorkStyle((prev) => ({
-                        ...prev,
-                        collaboration: e.target
-                          .value as WorkStyle["collaboration"],
-                      }))
-                    }
-                    className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
-                  >
-                    <option value="independent">Independent (solo work)</option>
-                    <option value="collaborative">
-                      Collaborative (pair/team work)
-                    </option>
-                    <option value="balanced">Balanced (mix of both)</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label
-                    htmlFor="pace"
-                    className="block text-xs font-medium text-slate-600"
-                  >
-                    Work Pace
-                  </label>
-                  <select
-                    id="pace"
-                    value={memberWorkStyle.pace}
-                    onChange={(e) =>
-                      setMemberWorkStyle((prev) => ({
-                        ...prev,
-                        pace: e.target.value as WorkStyle["pace"],
-                      }))
-                    }
-                    className="mt-1 w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
-                  >
-                    <option value="fast">Fast-paced (sprints, deadlines)</option>
-                    <option value="steady">Steady (consistent rhythm)</option>
-                    <option value="flexible">Flexible (adapts as needed)</option>
-                  </select>
-                </div>
-              </div>
-            </div>
-
-            {/* Actions */}
-            <div className="flex justify-end gap-3 border-t border-slate-100 p-6">
-              <button
-                type="button"
-                onClick={() => setShowAddMemberModal(false)}
-                className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={handleAddMember}
-                disabled={!memberName.trim() || !memberRole.trim()}
-                className="btn-lift flex items-center gap-2 rounded-lg gradient-bg px-4 py-2 text-sm font-medium text-white shadow-button disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                <UserPlus className="h-4 w-4" />
-                Add Member
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Candidate Detail Modal */}
       <CandidateDetailModal

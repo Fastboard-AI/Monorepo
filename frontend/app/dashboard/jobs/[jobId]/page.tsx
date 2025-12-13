@@ -26,12 +26,10 @@ import { EditJobModal } from "../../../components/EditJobModal";
 import { DeleteConfirmModal } from "../../../components/DeleteConfirmModal";
 import { SourceCandidatesModal } from "../../../components/SourceCandidatesModal";
 import { JobTeamPanel } from "../../../components/JobTeamPanel";
-import { CreateTeamFromJobModal } from "../../../components/CreateTeamFromJobModal";
-import { AddTeamMemberModal } from "../../../components/AddTeamMemberModal";
 import { useJobsStorage } from "../../../hooks/useJobsStorage";
 import { useTeamsStorage } from "../../../hooks/useTeamsStorage";
 import { mockCandidates } from "../../../data/mockCandidates";
-import type { Candidate, Job, Team, TeamMember, ExperienceLevel, JobStatus } from "../../../types";
+import type { Candidate, Job, Team, ExperienceLevel, JobStatus } from "../../../types";
 
 const statusConfig: Record<Job["status"], { label: string; className: string }> = {
   sourcing: {
@@ -81,10 +79,6 @@ export default function JobDetailPage() {
   const {
     teams,
     isLoading: teamsLoading,
-    createTeam,
-    updateTeam,
-    addTeamMember,
-    removeTeamMember,
     getTeamById,
   } = useTeamsStorage();
 
@@ -110,8 +104,6 @@ export default function JobDetailPage() {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [isSourceModalOpen, setIsSourceModalOpen] = useState(false);
-  const [isCreateTeamModalOpen, setIsCreateTeamModalOpen] = useState(false);
-  const [isAddMembersModalOpen, setIsAddMembersModalOpen] = useState(false);
 
   // Selection handlers
   const handleToggleSelect = useCallback((id: string) => {
@@ -193,49 +185,20 @@ export default function JobDetailPage() {
   );
 
   // Team handlers
-  const handleCreateTeamFromJob = useCallback(
-    (data: { name: string; targetRole?: string }) => {
-      const newTeam = createTeam({
-        name: data.name,
-        targetRole: data.targetRole,
-      });
-      linkTeamToJob(jobId, newTeam.id);
-      setIsCreateTeamModalOpen(false);
-    },
-    [createTeam, jobId, linkTeamToJob]
-  );
-
-  const handleEditTeam = useCallback(
-    (updates: { name?: string; targetRole?: string }) => {
-      if (linkedTeam) {
-        updateTeam(linkedTeam.id, updates);
+  const handleSelectTeam = useCallback(
+    (team: Team | null) => {
+      if (team) {
+        linkTeamToJob(jobId, team.id);
+      } else {
+        unlinkTeamFromJob(jobId);
       }
     },
-    [linkedTeam, updateTeam]
+    [jobId, linkTeamToJob, unlinkTeamFromJob]
   );
 
   const handleUnlinkTeam = useCallback(() => {
     unlinkTeamFromJob(jobId);
   }, [jobId, unlinkTeamFromJob]);
-
-  const handleAddTeamMember = useCallback(
-    (memberData: Omit<TeamMember, "id">) => {
-      if (linkedTeam) {
-        addTeamMember(linkedTeam.id, memberData);
-      }
-      setIsAddMembersModalOpen(false);
-    },
-    [addTeamMember, linkedTeam]
-  );
-
-  const handleRemoveTeamMember = useCallback(
-    (memberId: string) => {
-      if (linkedTeam) {
-        removeTeamMember(linkedTeam.id, memberId);
-      }
-    },
-    [linkedTeam, removeTeamMember]
-  );
 
   if (!isLoaded || isLoading || teamsLoading) {
     return (
@@ -377,11 +340,10 @@ export default function JobDetailPage() {
           <JobTeamPanel
             job={job}
             team={linkedTeam}
-            onCreateTeam={() => setIsCreateTeamModalOpen(true)}
-            onEditTeam={handleEditTeam}
+            teams={teams}
+            isLoadingTeams={teamsLoading}
+            onSelectTeam={handleSelectTeam}
             onUnlinkTeam={handleUnlinkTeam}
-            onAddMember={() => setIsAddMembersModalOpen(true)}
-            onRemoveMember={handleRemoveTeamMember}
           />
         </div>
 
@@ -490,21 +452,6 @@ export default function JobDetailPage() {
         isOpen={isSourceModalOpen}
         onClose={() => setIsSourceModalOpen(false)}
         onStartSourcing={handleStartSourcing}
-      />
-
-      {/* Team Modals */}
-      <CreateTeamFromJobModal
-        job={job}
-        isOpen={isCreateTeamModalOpen}
-        onClose={() => setIsCreateTeamModalOpen(false)}
-        onCreateTeam={handleCreateTeamFromJob}
-      />
-
-      <AddTeamMemberModal
-        team={linkedTeam}
-        isOpen={isAddMembersModalOpen}
-        onClose={() => setIsAddMembersModalOpen(false)}
-        onAddMember={handleAddTeamMember}
       />
     </div>
   );
