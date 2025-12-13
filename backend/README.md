@@ -45,51 +45,19 @@ Rust backend service for AI-powered talent matching, team management, and candid
    ```
 
 5. **Create database tables**
-   ```sql
-   CREATE TABLE teams (
-     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-     name VARCHAR NOT NULL,
-     target_role VARCHAR,
-     compatibility_score INT DEFAULT 75,
-     created_at TIMESTAMPTZ DEFAULT NOW(),
-     updated_at TIMESTAMPTZ DEFAULT NOW()
-   );
 
-   CREATE TABLE team_members (
-     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-     team_id UUID REFERENCES teams(id) ON DELETE CASCADE,
-     name VARCHAR NOT NULL,
-     role VARCHAR NOT NULL,
-     skills JSONB DEFAULT '[]',
-     experience_level VARCHAR DEFAULT 'mid',
-     work_style JSONB DEFAULT '{}',
-     created_at TIMESTAMPTZ DEFAULT NOW()
-   );
-
-   CREATE TABLE jobs (
-     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-     title VARCHAR NOT NULL,
-     description TEXT,
-     location VARCHAR,
-     required_skills JSONB DEFAULT '[]',
-     experience_level VARCHAR DEFAULT 'any',
-     status VARCHAR DEFAULT 'sourcing',
-     team_id UUID REFERENCES teams(id),
-     created_at TIMESTAMPTZ DEFAULT NOW(),
-     updated_at TIMESTAMPTZ DEFAULT NOW()
-   );
-
-   CREATE TABLE candidates (
-     id SERIAL PRIMARY KEY,
-     name VARCHAR NOT NULL,
-     degrees JSON NOT NULL,
-     style JSON NOT NULL,
-     github VARCHAR NOT NULL,
-     email VARCHAR NOT NULL,
-     stacks JSON NOT NULL,
-     employed BOOLEAN NOT NULL
-   );
+   Run the schema file in your Neon SQL console:
+   ```bash
+   # Copy contents of schema.sql and paste into Neon console
+   # Or use psql if available:
+   psql $DATABASE_URL -f schema.sql
    ```
+
+   See `schema.sql` for the full schema including:
+   - `teams` - Team definitions
+   - `team_members` - Members with skills and work styles
+   - `jobs` - Job postings with requirements
+   - `candidates` - Candidates with AI-analyzed code characteristics
 
 6. **Run the server**
    ```bash
@@ -386,6 +354,7 @@ backend/
 │       ├── ep_teams.rs            # Teams CRUD + members
 │       ├── ep_sourcing.rs         # Candidate sourcing (mock)
 │       └── ep_match_candidates.rs # (WIP) Matching endpoint
+├── schema.sql                     # Database schema (run in Neon)
 ├── Cargo.toml                     # Dependencies
 ├── Rocket.toml                    # Rocket configuration
 ├── .env                           # Environment variables
