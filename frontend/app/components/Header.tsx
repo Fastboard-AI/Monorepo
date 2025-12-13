@@ -32,6 +32,12 @@ export function Header() {
               Teams
             </Link>
             <Link
+              href="/dashboard/ai-sourcing"
+              className="rounded-lg px-3 py-2 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-900"
+            >
+              AI Sourcing
+            </Link>
+            <Link
               href="/dashboard/resume-matcher"
               className="rounded-lg px-3 py-2 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-900"
             >
