@@ -22,18 +22,24 @@ Rust backend service for AI-powered candidate code style analysis and matching.
    cd backend
    ```
 
-2. **Copy environment variables**
+2. **Copy environment files**
    ```bash
    cp .env.example .env
+   cp Rocket.toml.example Rocket.toml
    ```
 
 3. **Configure `.env`**
    ```bash
    GEMINI_API_KEY=your_gemini_api_key
-   DATABASE_URL=postgresql://user:password@host/database?sslmode=require
    ```
 
-4. **Run the server**
+4. **Configure `Rocket.toml`**
+   ```toml
+   [default.databases.main]
+   url = "postgresql://user:password@host/database?sslmode=require"
+   ```
+
+5. **Run the server**
    ```bash
    cargo run
    ```

@@ -1,0 +1,11 @@
+# Rocket Configuration
+# Copy this file to Rocket.toml and fill in your values
+
+[default]
+address = "0.0.0.0"
+port = 8000
+
+[default.databases.main]
+# PostgreSQL connection string
+# For Neon: postgresql://user:password@ep-xxx.region.aws.neon.tech/dbname?sslmode=require
+url = "postgresql://user:password@localhost:5432/fastboardai?sslmode=require"
