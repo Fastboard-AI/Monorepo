@@ -45,6 +45,7 @@ pub async fn generate_characteristics_from_repo(
     let chat_res = client
         .exec_chat(MODEL_GEMINI, chat_req, Some(&options))
         .await?;
+
     let res = chat_res
             .content
             .joined_texts()
@@ -83,7 +84,6 @@ fn concatenate_files(repo_path: &Path) -> Result<String, io::Error> {
     Ok(all_code)
 }
 
-/// Helper function to filter out hidden files/directories (like .git).
 fn is_hidden(entry: &walkdir::DirEntry) -> bool {
     if entry.file_name() == ".git" {
         return true;
