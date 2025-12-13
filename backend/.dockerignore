@@ -1,0 +1,10 @@
+target/
+.env
+.env.local
+*.log
+.git
+.gitignore
+Dockerfile
+.dockerignore
+README.md
+schema.sql
