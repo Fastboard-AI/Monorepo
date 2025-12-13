@@ -13,7 +13,6 @@ import {
 } from "lucide-react";
 
 import { Header } from "../../components/Header";
-import { JobsNavBar } from "../../components/JobsNavBar";
 import { JobCard } from "../../components/JobCard";
 import { CreateJobModal } from "../../components/CreateJobModal";
 import { EditJobModal } from "../../components/EditJobModal";
@@ -177,7 +176,6 @@ export default function JobsPage() {
   return (
     <div className="min-h-screen bg-slate-50">
       <Header />
-      <JobsNavBar />
 
       <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
         {/* Page Header */}

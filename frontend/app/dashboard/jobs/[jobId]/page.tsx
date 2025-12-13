@@ -17,7 +17,6 @@ import {
 } from "lucide-react";
 
 import { Header } from "../../../components/Header";
-import { JobsNavBar } from "../../../components/JobsNavBar";
 import { SelectableCandidateCard } from "../../../components/SelectableCandidateCard";
 import { CandidateDetailModal } from "../../../components/CandidateDetailModal";
 import { CandidateComparisonPanel } from "../../../components/CandidateComparisonPanel";
@@ -216,7 +215,6 @@ export default function JobDetailPage() {
     return (
       <div className="min-h-screen bg-slate-50">
         <Header />
-        <JobsNavBar />
         <main className="mx-auto max-w-7xl px-4 py-16 text-center sm:px-6">
           <Briefcase className="mx-auto h-16 w-16 text-slate-300" />
           <h1 className="mt-4 text-2xl font-bold text-slate-900">Job not found</h1>
@@ -245,7 +243,6 @@ export default function JobDetailPage() {
   return (
     <div className="min-h-screen bg-slate-50">
       <Header />
-      <JobsNavBar />
 
       <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6">
         {/* Back button */}
