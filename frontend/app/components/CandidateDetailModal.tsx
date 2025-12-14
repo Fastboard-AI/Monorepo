@@ -12,6 +12,11 @@ import {
   Globe,
   FileText,
   Calendar,
+  Bot,
+  Shield,
+  Code,
+  Loader2,
+  AlertCircle,
 } from "lucide-react";
 import type { Candidate } from "../types";
 import { ScoreRing } from "./ScoreRing";
@@ -235,6 +240,92 @@ export function CandidateDetailModal({
                 <h3 className="mb-3 font-semibold text-slate-900">Score Breakdown</h3>
                 <ScoreBreakdown breakdown={candidate.scoreBreakdown} showChart={false} />
               </div>
+
+              {/* GitHub Analysis Section */}
+              {candidate.links?.github && (
+                <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-card">
+                  <h3 className="mb-3 flex items-center gap-2 font-semibold text-slate-900">
+                    <Github className="h-5 w-5" />
+                    GitHub Analysis
+                  </h3>
+
+                  {candidate.analysisStatus === "analyzing" ? (
+                    <div className="flex items-center gap-2 text-amber-600">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      <span className="text-sm">Analyzing GitHub profile...</span>
+                    </div>
+                  ) : candidate.analysisStatus === "failed" ? (
+                    <div className="flex items-center gap-2 text-red-600">
+                      <AlertCircle className="h-4 w-4" />
+                      <span className="text-sm">Analysis failed</span>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {/* AI Detection Score */}
+                      {candidate.aiDetectionScore !== undefined && (
+                        <div className="flex items-center justify-between">
+                          <span className="flex items-center gap-2 text-sm text-slate-600">
+                            <Bot className="h-4 w-4 text-slate-400" />
+                            AI Detection
+                          </span>
+                          <span className={`text-sm font-semibold ${
+                            candidate.aiDetectionScore > 70 ? "text-red-600" :
+                            candidate.aiDetectionScore > 40 ? "text-amber-600" : "text-emerald-600"
+                          }`}>
+                            {candidate.aiDetectionScore}%
+                          </span>
+                        </div>
+                      )}
+
+                      {/* Code Authenticity Score */}
+                      {candidate.codeAuthenticityScore !== undefined && (
+                        <div className="flex items-center justify-between">
+                          <span className="flex items-center gap-2 text-sm text-slate-600">
+                            <Shield className="h-4 w-4 text-slate-400" />
+                            Code Authenticity
+                          </span>
+                          <span className={`text-sm font-semibold ${
+                            candidate.codeAuthenticityScore > 70 ? "text-emerald-600" :
+                            candidate.codeAuthenticityScore > 40 ? "text-amber-600" : "text-red-600"
+                          }`}>
+                            {candidate.codeAuthenticityScore}%
+                          </span>
+                        </div>
+                      )}
+
+                      {/* AI Proficiency Score */}
+                      {candidate.aiProficiencyScore !== undefined && (
+                        <div className="flex items-center justify-between">
+                          <span className="flex items-center gap-2 text-sm text-slate-600">
+                            <Code className="h-4 w-4 text-slate-400" />
+                            AI Proficiency
+                          </span>
+                          <span className="text-sm font-semibold text-indigo-600">
+                            {candidate.aiProficiencyScore}%
+                          </span>
+                        </div>
+                      )}
+
+                      {/* Developer Profile */}
+                      {candidate.developerProfile && (
+                        <div className="mt-3 pt-3 border-t border-slate-100">
+                          <p className="text-xs font-medium text-slate-500 mb-1">Developer Profile</p>
+                          <p className="text-sm text-slate-700 leading-relaxed">
+                            {candidate.developerProfile}
+                          </p>
+                        </div>
+                      )}
+
+                      {/* No analysis data yet */}
+                      {!candidate.aiDetectionScore && !candidate.codeAuthenticityScore && !candidate.developerProfile && (
+                        <p className="text-sm text-slate-500 italic">
+                          No analysis data available yet
+                        </p>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
 
               {candidate.resumeFileName && (
                 <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
