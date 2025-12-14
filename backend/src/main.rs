@@ -8,7 +8,7 @@ use rocket_cors::{AllowedOrigins, CorsOptions};
 
 #[rocket::main]
 async fn main() -> Result<(), Box<dyn Error>> {
-    dotenv()?;
+    dotenv().ok(); // Optional - env vars may come from Docker instead
 
     let cors = CorsOptions::default()
         .allowed_origins(AllowedOrigins::all())
