@@ -19,6 +19,7 @@ import {
 import { Header } from "../components";
 import { useJobs } from "../hooks/useJobs";
 import { useTeams } from "../hooks/useTeams";
+import { getSkillName } from "../types";
 
 const statusColors: Record<string, string> = {
   sourcing: "bg-indigo-100 text-indigo-700",
@@ -198,15 +199,15 @@ export default function DashboardPage() {
             </Link>
 
             <Link
-              href="/dashboard/resume-matcher"
+              href="/dashboard/ai-sourcing"
               className="group flex items-center gap-4 rounded-xl border border-slate-200 bg-white p-5 transition-all hover:border-indigo-300 hover:shadow-sm"
             >
               <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-indigo-600">
                 <Sparkles className="h-5 w-5 text-white" />
               </div>
               <div className="flex-1">
-                <p className="font-medium text-slate-900">Match Resumes</p>
-                <p className="text-sm text-slate-500">AI-powered matching</p>
+                <p className="font-medium text-slate-900">AI Sourcing</p>
+                <p className="text-sm text-slate-500">Find candidates with AI</p>
               </div>
               <ArrowRight className="h-5 w-5 text-slate-300 transition-transform group-hover:translate-x-1 group-hover:text-indigo-500" />
             </Link>
@@ -289,7 +290,7 @@ export default function DashboardPage() {
                         </span>
                         {job.requiredSkills.length > 0 && (
                           <span className="truncate">
-                            {job.requiredSkills.slice(0, 2).join(", ")}
+                            {job.requiredSkills.slice(0, 2).map(getSkillName).join(", ")}
                             {job.requiredSkills.length > 2 && "..."}
                           </span>
                         )}
@@ -391,16 +392,16 @@ export default function DashboardPage() {
                 <div>
                   <p className="font-semibold text-slate-900">Pro Tip</p>
                   <p className="text-sm text-slate-600">
-                    Use Resume Matcher for bulk screening
+                    Use AI Sourcing to find candidates
                   </p>
                 </div>
               </div>
               <Link
-                href="/dashboard/resume-matcher"
+                href="/dashboard/ai-sourcing"
                 className="mt-4 flex items-center justify-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-indigo-700"
               >
                 <Sparkles className="h-4 w-4" />
-                Try Resume Matcher
+                Try AI Sourcing
               </Link>
             </div>
           </div>
