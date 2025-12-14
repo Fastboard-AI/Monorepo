@@ -534,6 +534,7 @@ struct JobData {
     experience_level: String,
     title: String,
     description: Option<String>,
+    location: Option<String>,
 }
 
 /// Team member profile for compatibility scoring
@@ -759,7 +760,7 @@ pub async fn search_candidates(
     // Fetch job data from database
     let job_data = if let Ok(job_uuid) = uuid::Uuid::parse_str(&data.job_id) {
         match sqlx::query(
-            r#"SELECT title, description, required_skills, experience_level FROM jobs WHERE id = $1"#
+            r#"SELECT title, description, location, required_skills, experience_level FROM jobs WHERE id = $1"#
         )
         .bind(job_uuid)
         .fetch_optional(&mut **db)
@@ -773,6 +774,7 @@ pub async fn search_candidates(
                         .unwrap_or_else(|| "any".to_string()),
                     title: row.get("title"),
                     description: row.get("description"),
+                    location: row.get("location"),
                 }
             }
             _ => JobData {
@@ -780,6 +782,7 @@ pub async fn search_candidates(
                 experience_level: "any".to_string(),
                 title: "Unknown Position".to_string(),
                 description: None,
+                location: None,
             },
         }
     } else {
@@ -788,6 +791,7 @@ pub async fn search_candidates(
             experience_level: "any".to_string(),
             title: "Unknown Position".to_string(),
             description: None,
+            location: None,
         }
     };
 
@@ -820,10 +824,13 @@ pub async fn search_candidates(
         // Use job title as the search role with AI-powered query expansion
         let search_role = &job_data.title;
 
-        println!("[Sourcing] Starting LinkedIn search with query expansion for: {}", search_role);
+        // Use job location if available, otherwise default to broad search
+        let search_location = job_data.location.as_deref().unwrap_or("Australia");
+
+        println!("[Sourcing] Starting LinkedIn search with query expansion for: {} in {}", search_role, search_location);
 
         // Use expanded search with multiple query variations
-        let results = search_linkedin_with_expansion(search_role, "Sydney", count).await;
+        let results = search_linkedin_with_expansion(search_role, search_location, count).await;
 
         println!("[Sourcing] Found {} total unique LinkedIn profiles", results.len());
         for result in &results {

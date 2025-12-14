@@ -25,7 +25,7 @@ import {
 } from "../../components";
 import { useJobs } from "../../hooks/useJobs";
 import { useTeams } from "../../hooks/useTeams";
-import type { Job, Team, TeamMember, Candidate, Skill } from "../../types";
+import type { Job, Team, Candidate, Skill } from "../../types";
 import { getSkillName } from "../../types";
 
 type SourceType = "linkedin" | "github" | "portfolio";
@@ -35,147 +35,6 @@ const sourceConfig: Record<SourceType, { label: string; icon: typeof Linkedin; c
   github: { label: "GitHub", icon: Github, color: "text-slate-800 bg-slate-100" },
   portfolio: { label: "Portfolio", icon: Globe, color: "text-emerald-600 bg-emerald-50" },
 };
-
-// Names by source type for more realistic profiles
-const namesBySource: Record<SourceType, { first: string[]; last: string[] }> = {
-  linkedin: {
-    first: ["Michael", "Sarah", "David", "Jennifer", "Robert", "Emily", "James", "Amanda"],
-    last: ["Thompson", "Martinez", "Anderson", "Williams", "Johnson", "Brown", "Davis", "Wilson"],
-  },
-  github: {
-    first: ["Alex", "Jordan", "Sam", "Chris", "Taylor", "Morgan", "Casey", "Riley"],
-    last: ["Chen", "Kumar", "Nakamura", "Schmidt", "Petrov", "Santos", "Kim", "Patel"],
-  },
-  portfolio: {
-    first: ["Luna", "Felix", "Maya", "Leo", "Aria", "Kai", "Nova", "River"],
-    last: ["Rivera", "Foster", "Hayes", "Brooks", "Reed", "Cole", "Lane", "Stone"],
-  },
-};
-
-const titlesBySource: Record<SourceType, string[]> = {
-  linkedin: [
-    "Senior Software Engineer",
-    "Engineering Manager",
-    "Technical Lead",
-    "Principal Engineer",
-    "Staff Engineer",
-    "Director of Engineering",
-  ],
-  github: [
-    "Full-Stack Developer",
-    "Open Source Contributor",
-    "DevOps Engineer",
-    "Backend Developer",
-    "Systems Programmer",
-    "Platform Engineer",
-  ],
-  portfolio: [
-    "Creative Developer",
-    "UI/UX Engineer",
-    "Frontend Developer",
-    "Design Engineer",
-    "Product Designer",
-    "Interaction Designer",
-  ],
-};
-
-const extraSkillsBySource: Record<SourceType, string[]> = {
-  linkedin: ["Leadership", "Agile", "Scrum", "Project Management", "Stakeholder Management"],
-  github: ["Git", "CI/CD", "Docker", "Kubernetes", "Linux", "Open Source"],
-  portfolio: ["Figma", "Design Systems", "Animation", "Prototyping", "User Research"],
-};
-
-function generateSourcedCandidate(
-  job: Job,
-  teamMembers: TeamMember[],
-  source: SourceType
-): { candidate: Candidate; jobScore: number; teamScore: number; source: SourceType } {
-  const names = namesBySource[source];
-  const randomFirst = names.first[Math.floor(Math.random() * names.first.length)];
-  const randomLast = names.last[Math.floor(Math.random() * names.last.length)];
-
-  const titles = titlesBySource[source];
-  const randomTitle = titles[Math.floor(Math.random() * titles.length)];
-
-  // Generate skills based on job requirements with source-specific extras
-  const baseSkills = job.requiredSkills.slice(0, 4).map(getSkillName);
-  const extraSkills = extraSkillsBySource[source];
-  const candidateSkillNames: string[] = [
-    ...baseSkills.slice(0, Math.floor(Math.random() * baseSkills.length + 2)),
-    ...extraSkills.slice(0, Math.floor(Math.random() * 3) + 1),
-  ];
-
-  const skillLevels: Skill["level"][] = ["beginner", "intermediate", "advanced", "expert"];
-  const skills: Skill[] = candidateSkillNames.map((name) => ({
-    name,
-    level: skillLevels[Math.floor(Math.random() * skillLevels.length)],
-  }));
-
-  // Calculate job match score
-  const jobSkillNames = job.requiredSkills.map(getSkillName);
-  const matchingSkills = jobSkillNames.filter((s) =>
-    candidateSkillNames.includes(s)
-  );
-  const jobScore = Math.min(
-    95,
-    Math.round(60 + (matchingSkills.length / Math.max(job.requiredSkills.length, 1)) * 35)
-  );
-
-  // Calculate team compatibility score
-  let teamScore = 75;
-  if (teamMembers.length > 0) {
-    const teamSkills = new Set(
-      teamMembers.flatMap((m) => m.skills.map((s) => s.name))
-    );
-    const complementarySkills = candidateSkillNames.filter(
-      (s) => !teamSkills.has(s)
-    );
-    const overlapSkills = candidateSkillNames.filter((s) => teamSkills.has(s));
-    teamScore = Math.min(
-      98,
-      Math.round(70 + complementarySkills.length * 3 + overlapSkills.length * 2)
-    );
-  }
-
-  const companies: Record<SourceType, string[]> = {
-    linkedin: ["Google", "Microsoft", "Amazon", "Meta", "Apple", "Netflix"],
-    github: ["Vercel", "Supabase", "Stripe", "GitHub", "GitLab", "Hashicorp"],
-    portfolio: ["IDEO", "Figma", "Framer", "Webflow", "Squarespace", "Canva"],
-  };
-
-  const candidate: Candidate = {
-    id: Math.random().toString(36).substring(2, 9) + Date.now().toString(36),
-    name: `${randomFirst} ${randomLast}`,
-    email: `${randomFirst.toLowerCase()}.${randomLast.toLowerCase()}@email.com`,
-    title: randomTitle,
-    skills,
-    experience: [
-      {
-        title: randomTitle,
-        company: companies[source][Math.floor(Math.random() * companies[source].length)],
-        duration: `${Math.floor(Math.random() * 5 + 1)} years`,
-      },
-    ],
-    education: [
-      {
-        degree: source === "portfolio" ? "B.A. Design" : "B.S. Computer Science",
-        institution: "University",
-        year: "2020",
-      },
-    ],
-    links: {},
-    talentFitScore: Math.round((jobScore + teamScore) / 2),
-    scoreBreakdown: {
-      skillsMatch: jobScore,
-      experienceMatch: Math.round(70 + Math.random() * 25),
-      workStyleAlignment: teamScore,
-      teamFit: teamScore,
-    },
-    uploadedAt: new Date(),
-  };
-
-  return { candidate, jobScore, teamScore, source };
-}
 
 export default function AISourcingPage() {
   const { jobs, isLoading: isLoadingJobs } = useJobs();
@@ -330,25 +189,7 @@ export default function AISourcingPage() {
       setSourcedResults(results);
     } catch (error) {
       console.error("Sourcing failed:", error);
-      // Fallback to mock generation if API fails
-      const teamMembers = selectedTeam?.members || [];
-      const results: typeof sourcedResults = [];
-      const candidatesPerSource = Math.ceil(candidateCount / sources.length);
-
-      for (const source of sources) {
-        const count = Math.min(candidatesPerSource, candidateCount - results.length);
-        for (let i = 0; i < count; i++) {
-          results.push(generateSourcedCandidate(selectedJob, teamMembers, source));
-        }
-      }
-
-      results.sort((a, b) => {
-        const overallA = (a.jobScore + a.teamScore) / 2;
-        const overallB = (b.jobScore + b.teamScore) / 2;
-        return overallB - overallA;
-      });
-
-      setSourcedResults(results);
+      alert("Failed to source candidates. Make sure the backend and scraping services are running.");
     }
 
     setIsSearching(false);
