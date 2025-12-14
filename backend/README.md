@@ -293,7 +293,7 @@ The `compatibility_score` on teams is automatically calculated when members are 
 ### Sourcing
 
 #### POST /api/sourcing/search
-Search for candidates (returns mock data).
+Search for candidates using AI-powered query expansion and real LinkedIn discovery.
 
 **Request:**
 ```json
@@ -305,42 +305,70 @@ Search for candidates (returns mock data).
 }
 ```
 
+**How it works:**
+1. Fetches job title from the database
+2. Uses **Gemini AI** to expand job title into 5-8 search variations (e.g., "AI Engineer" → ["AI Engineer", "ML Engineer", "Machine Learning Engineer", "Deep Learning Engineer", ...])
+3. Calls the **Python scraping service** to search LinkedIn via DuckDuckGo for each variation
+4. Deduplicates results by LinkedIn URL
+5. Parses candidate info from search results (name, title, skills from description)
+6. Scores each candidate using the full matching engine
+7. Falls back to mock data if scraping service is unavailable
+
+**Environment Variable:**
+```
+SCRAPING_SERVICE_URL=http://localhost:8001
+```
+
 **Response:**
 ```json
 [
   {
     "id": "uuid",
     "name": "Jane Smith",
-    "title": "Senior Software Engineer",
-    "location": "San Francisco, CA",
+    "title": "Senior ML Engineer",
+    "location": "Unknown",
     "skills": [
-      {"name": "TypeScript", "level": "expert", "match_type": "exact"}
+      {"name": "Machine Learning", "level": "intermediate", "match_type": "inferred"},
+      {"name": "Python", "level": "intermediate", "match_type": "inferred"}
     ],
     "experience": [
       {
-        "title": "Staff Engineer",
-        "company": "Google",
-        "duration": "3 years",
-        "description": "..."
+        "title": "Senior ML Engineer",
+        "company": "Unknown",
+        "duration": "Unknown",
+        "description": "Machine learning engineer with 5+ years experience..."
       }
     ],
-    "education": [
-      {"degree": "B.S. Computer Science", "institution": "MIT", "year": "2018"}
-    ],
+    "education": [],
     "links": {
-      "github": "https://github.com/janesmith",
-      "linkedin": "https://linkedin.com/in/janesmith"
+      "github": null,
+      "linkedin": "https://au.linkedin.com/in/janesmith",
+      "portfolio": null
     },
-    "talent_fit_score": 87,
+    "talent_fit_score": 72,
     "score_breakdown": {
-      "skills": 92,
-      "experience": 85,
-      "culture": 84
+      "skills": {"score": 65, "matched": ["Python"], "missing": ["TensorFlow"], "bonus": [], "reasoning": "..."},
+      "experience": {"score": 80, "matched": [...], "missing": [], "bonus": [...], "reasoning": "..."},
+      "team_fit": {"score": 75, "matched": [...], "missing": [], "bonus": [], "reasoning": "..."},
+      "culture": {"score": 60, "matched": [], "missing": [...], "bonus": [], "reasoning": "..."}
     },
-    "source": "github"
+    "source": "linkedin"
   }
 ]
 ```
+
+**Query Expansion Examples:**
+
+| Job Title | Expanded Queries |
+|-----------|-----------------|
+| AI Engineer | AI Engineer, ML Engineer, Machine Learning Engineer, Deep Learning Engineer, AI/ML Engineer, Applied Scientist |
+| DevOps Engineer | DevOps Engineer, SRE, Site Reliability Engineer, Platform Engineer, Infrastructure Engineer |
+| Full Stack Developer | Full Stack Developer, Fullstack Developer, Web Developer, Software Engineer |
+
+**Fallback Behavior:**
+- If Gemini AI is unavailable, uses hardcoded variations for common job titles
+- If scraping service is unavailable, generates mock candidates
+- If not enough real candidates found, fills remaining slots with mock data
 
 ---
 

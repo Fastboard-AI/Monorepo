@@ -70,3 +70,20 @@ class ScrapeRequest(BaseModel):
 
 class SearchRequest(BaseModel):
     targets: List[SearchTarget]
+
+
+class DevSiteSearchTarget(BaseModel):
+    """Target for searching developer personal sites."""
+    name: str  # Developer name to search for
+    keywords: List[str] = []  # Additional keywords (skills, company, etc.)
+    include_github: bool = True
+    include_portfolio: bool = True
+    include_blog: bool = True
+
+
+class DevSiteResult(BaseModel):
+    """Result from developer site search."""
+    url: str
+    title: Optional[str] = None
+    description: Optional[str] = None
+    site_type: str  # github, portfolio, blog, other

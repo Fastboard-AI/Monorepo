@@ -10,7 +10,7 @@ from pathlib import Path
 
 from duckduckgo_search import DDGS
 
-from ..models import SearchTarget, ProfileSearchResult
+from ..models import SearchTarget, ProfileSearchResult, DevSiteSearchTarget, DevSiteResult
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger("ProfileSearcher")
@@ -106,10 +106,11 @@ class ProfileSearcher:
 
     def _build_queries(self, target: SearchTarget) -> List[str]:
         """Build search queries for a target."""
-        base = f'site:linkedin.com/in "{target.role}" "{target.location}"'
+        # Don't use site: operator - DDG blocks it. Include linkedin.com/in in query instead.
+        base = f'linkedin.com/in {target.role} {target.location}'
 
         if target.filter_by_uni:
-            return [f'{base} "{uni}"' for uni in AUSTRALIAN_UNIS]
+            return [f'{base} {uni}' for uni in AUSTRALIAN_UNIS]
         return [base]
 
     def _search_ddgs(
@@ -121,17 +122,23 @@ class ProfileSearcher:
         """Execute DuckDuckGo search."""
         results = []
         try:
+            logger.info(f"Executing DDG search: {query}")
+            # duckduckgo_search v8+ API - use lite backend without timelimit
+            # timelimit forces Bing backend which doesn't return LinkedIn profiles
             ddgs_results = DDGS().text(
-                query=query,
-                region='au-en',
+                query,
+                region='wt-wt',  # worldwide
                 safesearch='off',
-                timelimit=timeframe,
+                timelimit=None,  # timelimit uses Bing which blocks LinkedIn
+                backend='lite',  # lite backend works for LinkedIn searches
                 max_results=max_results,
-                backend='auto'
             )
+
+            logger.info(f"DDG returned {len(ddgs_results) if ddgs_results else 0} raw results")
 
             for r in ddgs_results:
                 href = r.get('href', '')
+                logger.debug(f"Result href: {href}")
                 if 'linkedin.com/in/' in href:
                     results.append(ProfileSearchResult(
                         href=href,
@@ -139,7 +146,7 @@ class ProfileSearcher:
                         description=r.get('body'),
                     ))
         except Exception as e:
-            logger.error(f"Search error: {e}")
+            logger.error(f"Search error: {e}", exc_info=True)
 
         return results
 
@@ -187,3 +194,166 @@ class ProfileSearcher:
         """Search for a single target without saving."""
         self.targets = [target]
         return self.search(save_to_db=False)
+
+
+class DevSiteSearcher:
+    """Search for developer personal sites, portfolios, and blogs."""
+
+    # Common portfolio/personal site patterns
+    PORTFOLIO_INDICATORS = [
+        'portfolio', 'projects', 'work', 'about me', 'developer',
+        'engineer', 'resume', 'cv', 'personal site', 'personal website'
+    ]
+
+    BLOG_INDICATORS = [
+        'blog', 'posts', 'articles', 'writing', 'thoughts', 'notes',
+        'dev.to', 'medium.com', 'hashnode', 'substack'
+    ]
+
+    # Domains to exclude (not personal sites)
+    EXCLUDED_DOMAINS = [
+        'linkedin.com', 'facebook.com', 'twitter.com', 'x.com',
+        'instagram.com', 'tiktok.com', 'youtube.com', 'indeed.com',
+        'glassdoor.com', 'seek.com', 'monster.com', 'ziprecruiter.com',
+        'crunchbase.com', 'bloomberg.com', 'reuters.com', 'wikipedia.org',
+        'google.com', 'bing.com', 'yahoo.com', 'amazon.com',
+        'baidu.com', 'zhihu.com', 'weibo.com', 'qq.com',  # Chinese sites
+        'pinterest.com', 'reddit.com', 'quora.com', 'stackoverflow.com',
+        'npmjs.com', 'pypi.org', 'crates.io',  # Package registries
+        'babycenter.com', 'babynames.com', 'nameberry.com',  # Baby name sites
+        'imdb.com', 'rottentomatoes.com', 'goodreads.com',  # Entertainment
+        'coursera.org', 'udemy.com', 'edx.org',  # Learning platforms
+        'ebay.com', 'etsy.com', 'aliexpress.com',  # Shopping
+        'boards.straightdope.com', 'forums.',  # Forums
+        'news.ycombinator.com',  # HN (not personal)
+    ]
+
+    def __init__(self):
+        self.logger = logging.getLogger("DevSiteSearcher")
+
+    def _classify_site(self, url: str, title: str, description: str) -> Optional[str]:
+        """Classify the type of developer site."""
+        url_lower = url.lower()
+        title_lower = (title or '').lower()
+        desc_lower = (description or '').lower()
+        combined = f"{url_lower} {title_lower} {desc_lower}"
+
+        # Check exclusions
+        for domain in self.EXCLUDED_DOMAINS:
+            if domain in url_lower:
+                return None
+
+        # GitHub
+        if 'github.com' in url_lower or 'github.io' in url_lower:
+            return 'github'
+
+        # Blog platforms
+        if any(ind in url_lower for ind in ['dev.to', 'medium.com', 'hashnode', 'substack']):
+            return 'blog'
+
+        # Check for blog indicators
+        if any(ind in combined for ind in self.BLOG_INDICATORS):
+            return 'blog'
+
+        # Check for portfolio indicators
+        if any(ind in combined for ind in self.PORTFOLIO_INDICATORS):
+            return 'portfolio'
+
+        # If it looks like a personal domain (short path, has name)
+        if '/' not in url_lower.split('://')[-1].rstrip('/') or url_lower.count('/') <= 3:
+            return 'portfolio'
+
+        return 'other'
+
+    def _search_ddgs(self, query: str, max_results: int = 50) -> List[dict]:
+        """Execute DuckDuckGo search."""
+        try:
+            self.logger.info(f"DDG search: {query}")
+            results = DDGS().text(
+                query,
+                region='wt-wt',
+                safesearch='off',
+                timelimit=None,
+                backend='lite',
+                max_results=max_results,
+            )
+            self.logger.info(f"Got {len(results) if results else 0} results")
+            return results or []
+        except Exception as e:
+            self.logger.error(f"Search error: {e}", exc_info=True)
+            return []
+
+    def search(self, target: DevSiteSearchTarget) -> List[DevSiteResult]:
+        """
+        Search for developer personal sites.
+
+        Args:
+            target: Search target with name and optional keywords
+
+        Returns:
+            List of discovered developer sites
+        """
+        all_results: List[DevSiteResult] = []
+        seen_urls = set()
+
+        queries = []
+
+        # Build queries based on options
+        keywords_str = ' '.join(target.keywords) if target.keywords else ''
+
+        if target.include_github:
+            # Search for actual GitHub profile, not just github.com
+            queries.append(f'"{target.name}" github profile {keywords_str}'.strip())
+            queries.append(f'"{target.name}" site:github.io {keywords_str}'.strip())
+
+        if target.include_portfolio:
+            queries.append(f'"{target.name}" portfolio site {keywords_str}'.strip())
+            queries.append(f'"{target.name}" personal website developer {keywords_str}'.strip())
+
+        if target.include_blog:
+            queries.append(f'"{target.name}" blog developer {keywords_str}'.strip())
+            queries.append(f'"{target.name}" site:dev.to OR site:medium.com {keywords_str}'.strip())
+
+        for query in queries:
+            results = self._search_ddgs(query)
+
+            for r in results:
+                url = r.get('href', '')
+                if url in seen_urls:
+                    continue
+
+                title = r.get('title', '')
+                description = r.get('body', '')
+
+                site_type = self._classify_site(url, title, description)
+                if site_type:
+                    seen_urls.add(url)
+                    all_results.append(DevSiteResult(
+                        url=url,
+                        title=title,
+                        description=description,
+                        site_type=site_type,
+                    ))
+
+            time.sleep(1)  # Rate limiting
+
+        self.logger.info(f"Found {len(all_results)} developer sites for {target.name}")
+        return all_results
+
+    def search_by_name(
+        self,
+        name: str,
+        keywords: List[str] = None,
+        include_github: bool = True,
+        include_portfolio: bool = True,
+        include_blog: bool = True,
+    ) -> List[DevSiteResult]:
+        """Convenience method to search by name."""
+        target = DevSiteSearchTarget(
+            name=name,
+            keywords=keywords or [],
+            include_github=include_github,
+            include_portfolio=include_portfolio,
+            include_blog=include_blog,
+        )
+        return self.search(target)

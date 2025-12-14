@@ -8,6 +8,8 @@ from .profile import (
     SearchTarget,
     ScrapeRequest,
     SearchRequest,
+    DevSiteSearchTarget,
+    DevSiteResult,
 )
 
 __all__ = [
@@ -20,4 +22,6 @@ __all__ = [
     "SearchTarget",
     "ScrapeRequest",
     "SearchRequest",
+    "DevSiteSearchTarget",
+    "DevSiteResult",
 ]

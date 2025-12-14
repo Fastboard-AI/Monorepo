@@ -11,8 +11,10 @@ from ..models import (
     ScrapeRequest,
     SearchRequest,
     SearchTarget,
+    DevSiteSearchTarget,
+    DevSiteResult,
 )
-from ..scrapers import ProfileSearcher, ProfileDatabase
+from ..scrapers import ProfileSearcher, ProfileDatabase, DevSiteSearcher
 
 router = APIRouter()
 
@@ -114,3 +116,55 @@ def set_scraper_session(scraper):
     """Set the global scraper session (called from main)."""
     global _scraper_session
     _scraper_session = scraper
+
+
+# ============================================
+# Developer Site Discovery Endpoints
+# ============================================
+
+@router.post("/api/search/dev-sites", response_model=List[DevSiteResult])
+async def search_dev_sites(target: DevSiteSearchTarget):
+    """
+    Search for developer personal sites, portfolios, and blogs.
+
+    This searches for:
+    - GitHub profiles and repos
+    - Personal portfolio websites
+    - Developer blogs (dev.to, Medium, Hashnode, personal blogs)
+
+    No authentication required.
+    """
+    searcher = DevSiteSearcher()
+    results = searcher.search(target)
+    return results
+
+
+@router.get("/api/search/dev-sites/{name}", response_model=List[DevSiteResult])
+async def search_dev_sites_by_name(
+    name: str,
+    keywords: Optional[str] = None,
+    include_github: bool = True,
+    include_portfolio: bool = True,
+    include_blog: bool = True,
+):
+    """
+    Search for developer sites by name (GET convenience endpoint).
+
+    Args:
+        name: Developer name to search for
+        keywords: Comma-separated keywords (skills, company, etc.)
+        include_github: Include GitHub results
+        include_portfolio: Include portfolio sites
+        include_blog: Include blog posts
+    """
+    searcher = DevSiteSearcher()
+    keyword_list = [k.strip() for k in keywords.split(',')] if keywords else []
+
+    results = searcher.search_by_name(
+        name=name,
+        keywords=keyword_list,
+        include_github=include_github,
+        include_portfolio=include_portfolio,
+        include_blog=include_blog,
+    )
+    return results
