@@ -306,13 +306,14 @@ Search for candidates using AI-powered query expansion and real LinkedIn discove
 ```
 
 **How it works:**
-1. Fetches job title from the database
+1. Fetches job title and location from the database
 2. Uses **Gemini AI** to expand job title into 5-8 search variations (e.g., "AI Engineer" → ["AI Engineer", "ML Engineer", "Machine Learning Engineer", "Deep Learning Engineer", ...])
 3. Calls the **Python scraping service** to search LinkedIn via DuckDuckGo for each variation
 4. Deduplicates results by LinkedIn URL
-5. Parses candidate info from search results (name, title, skills from description)
-6. Scores each candidate using the full matching engine
-7. Falls back to mock data if scraping service is unavailable
+5. **AI Relevance Filtering:** Uses Gemini to filter out irrelevant candidates (wrong profession, wrong location) and extract actual role/location from snippets
+6. Parses candidate info from search results (name, title, skills from description)
+7. Scores each candidate using the full matching engine
+8. Returns only real candidates (no mock data)
 
 **Environment Variable:**
 ```
@@ -326,7 +327,7 @@ SCRAPING_SERVICE_URL=http://localhost:8001
     "id": "uuid",
     "name": "Jane Smith",
     "title": "Senior ML Engineer",
-    "location": "Unknown",
+    "location": "Sydney, Australia",
     "skills": [
       {"name": "Machine Learning", "level": "intermediate", "match_type": "inferred"},
       {"name": "Python", "level": "intermediate", "match_type": "inferred"}
@@ -366,9 +367,10 @@ SCRAPING_SERVICE_URL=http://localhost:8001
 | Full Stack Developer | Full Stack Developer, Fullstack Developer, Web Developer, Software Engineer |
 
 **Fallback Behavior:**
-- If Gemini AI is unavailable, uses hardcoded variations for common job titles
-- If scraping service is unavailable, generates mock candidates
-- If not enough real candidates found, fills remaining slots with mock data
+- If Gemini AI query expansion is unavailable, uses hardcoded variations for common job titles
+- If AI relevance filtering fails, uses keyword-based filtering (excludes writers, marketers, recruiters, etc.)
+- If scraping service is unavailable, returns empty array
+- Only real candidates are returned - no mock data
 
 ---
 
@@ -709,7 +711,23 @@ The backend includes a comprehensive matching module that calculates explainable
 
 ### Skills Matching
 
-The skills matcher supports multiple match types:
+Skills matching uses a **combined scoring approach**:
+
+| Component | Weight | Description |
+|-----------|--------|-------------|
+| AI Matching | 90% | Gemini-powered candidate-to-job description matching |
+| Algorithmic | 10% | Traditional skill matching with synonyms and fuzzy matching |
+
+**AI Matching:** Sends candidate description + job info to Gemini, returns a 0-100 score. Scoring guide:
+- 90-100: Matches most required skills, strong relevant experience
+- 70-89: Matches many required skills, good experience fit
+- 50-69: Matches some skills, partial experience fit
+- 30-49: Few matching skills, limited relevance
+- 0-29: Almost no skill overlap
+
+The AI considers direct skill matches, equivalent technologies (e.g., Vue.js ≈ React, MySQL ≈ PostgreSQL), years of experience, and similar job roles.
+
+**Algorithmic Matching** supports multiple match types:
 
 | Match Type | Score Multiplier | Description |
 |------------|-----------------|-------------|
@@ -815,7 +833,7 @@ backend/
 │   │   └── take_home.rs           # Take-home project generation
 │   ├── matching/
 │   │   ├── mod.rs                 # Matching module exports, TalentFitScore, ScoreWeights
-│   │   ├── skills.rs              # Skill matching with synonyms and fuzzy matching
+│   │   ├── skills.rs              # Combined AI + algorithmic skill matching (90%/10%)
 │   │   ├── experience.rs          # Experience scoring with duration parsing
 │   │   ├── team_fit.rs            # Team fit calculation (skill gaps, work/code style)
 │   │   └── culture.rs             # AI-powered culture fit analysis
@@ -827,7 +845,7 @@ backend/
 │       ├── ep_github_analysis.rs  # Deep GitHub analysis endpoints
 │       ├── ep_jobs.rs             # Jobs CRUD
 │       ├── ep_teams.rs            # Teams CRUD + members
-│       ├── ep_sourcing.rs         # Candidate sourcing (mock)
+│       ├── ep_sourcing.rs         # Candidate sourcing with AI filtering
 │       ├── ep_candidates.rs       # Candidates CRUD + job linking
 │       ├── ep_match_candidates.rs # (WIP) Matching endpoint
 │       └── ep_take_home.rs        # Take-home project generation endpoints

@@ -1,5 +1,44 @@
 use super::{CandidateSkill, RequiredSkill, ExplainableScore};
 use std::collections::HashMap;
+use genai::chat::{ChatMessage, ChatRequest};
+use genai::Client;
+use serde::Deserialize;
+
+#[derive(Deserialize)]
+struct AISkillAnalysis {
+    score: i32,
+    reasoning: String,
+    strengths: Vec<String>,
+    gaps: Vec<String>,
+}
+
+const AI_SKILL_PROMPT: &str = r#"You are a technical recruiter evaluating candidate-job fit.
+
+Compare the candidate's skills and experience against the job requirements.
+
+Scoring guide:
+- 90-100: Matches most required skills, strong relevant experience
+- 70-89: Matches many required skills, good experience fit
+- 50-69: Matches some skills, partial experience fit
+- 30-49: Few matching skills, limited relevance
+- 0-29: Almost no skill overlap
+
+Consider:
+- Direct skill matches (e.g., Python to Python)
+- Equivalent skills (e.g., Vue.js is similar to React, MySQL is similar to PostgreSQL)
+- Years of relevant experience
+- Similar job roles/responsibilities
+
+Be generous with equivalent technologies. A senior developer with 8 years experience and overlapping skills should score 70+.
+
+Respond with JSON only:
+{
+  "score": 0-100,
+  "reasoning": "Brief explanation of the match",
+  "strengths": ["matching skill or experience 1", "matching skill or experience 2"],
+  "gaps": ["missing requirement 1"]
+}
+"#;
 
 fn level_weight(level: &str) -> f32 {
     match level.to_lowercase().as_str() {
@@ -150,4 +189,106 @@ pub fn calculate_skill_score(
     };
     
     ExplainableScore { score: final_score, matched, missing, bonus, reasoning: Some(reasoning) }
+}
+
+async fn calculate_ai_skill_match(
+    candidate_description: &str,
+    job_info: &str,
+) -> ExplainableScore {
+    if candidate_description.is_empty() || job_info.is_empty() {
+        return ExplainableScore {
+            score: 70,
+            matched: vec![],
+            missing: vec![],
+            bonus: vec![],
+            reasoning: Some("Insufficient data for AI skill analysis".to_string()),
+        };
+    }
+
+    let context = format!(
+        "CANDIDATE:\n{}\n\nJOB:\n{}",
+        candidate_description, job_info
+    );
+
+    match analyze_skills_with_gemini(&context).await {
+        Ok(analysis) => ExplainableScore {
+            score: analysis.score.min(100).max(0),
+            matched: analysis.strengths,
+            missing: analysis.gaps,
+            bonus: vec![],
+            reasoning: Some(analysis.reasoning),
+        },
+        Err(_) => ExplainableScore {
+            score: 70,
+            matched: vec![],
+            missing: vec![],
+            bonus: vec![],
+            reasoning: Some("AI skill analysis unavailable".to_string()),
+        },
+    }
+}
+
+async fn analyze_skills_with_gemini(context: &str) -> Result<AISkillAnalysis, Box<dyn std::error::Error + Send + Sync>> {
+    let client = Client::default();
+    let prompt = format!("{}\n\n{}", AI_SKILL_PROMPT, context);
+    let request = ChatRequest::new(vec![ChatMessage::user(prompt)]);
+
+    let response = client
+        .exec_chat("gemini-2.0-flash", request, None)
+        .await?;
+
+    let content = response
+        .first_text()
+        .ok_or("No response content")?;
+
+    let json_str = if content.contains("```json") {
+        content
+            .split("```json")
+            .nth(1)
+            .and_then(|s| s.split("```").next())
+            .unwrap_or(content)
+    } else if content.contains("```") {
+        content
+            .split("```")
+            .nth(1)
+            .unwrap_or(content)
+    } else {
+        content
+    };
+
+    let analysis: AISkillAnalysis = serde_json::from_str(json_str.trim())?;
+    Ok(analysis)
+}
+
+/// Combined skill scoring: 90% AI + 10% algorithmic
+pub async fn calculate_combined_skill_score(
+    candidate_skills: &[CandidateSkill],
+    required_skills: &[RequiredSkill],
+    candidate_description: &str,
+    job_info: &str,
+) -> ExplainableScore {
+    let algo_score = calculate_skill_score(candidate_skills, required_skills);
+    let ai_score = calculate_ai_skill_match(candidate_description, job_info).await;
+
+    let combined = ((ai_score.score as f32 * 0.9) + (algo_score.score as f32 * 0.1)).round() as i32;
+
+    let mut matched = ai_score.matched;
+    matched.extend(algo_score.matched.into_iter().map(|s| format!("[Algo] {}", s)));
+
+    let mut missing = ai_score.missing;
+    missing.extend(algo_score.missing.into_iter().map(|s| format!("[Algo] {}", s)));
+
+    let reasoning = format!(
+        "AI: {} | Algo: {}",
+        ai_score.reasoning.unwrap_or_default(),
+        algo_score.reasoning.unwrap_or_default()
+    );
+
+    ExplainableScore {
+        score: combined.min(100).max(0),
+        matched,
+        missing,
+        bonus: algo_score.bonus,
+        reasoning: Some(reasoning),
+    }
 }
