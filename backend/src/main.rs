@@ -44,6 +44,11 @@ async fn main() -> Result<(), Box<dyn Error>> {
             endpoints::add_candidate_to_job,
             endpoints::get_job_candidates,
             endpoints::remove_candidate_from_job,
+            // GitHub Analysis
+            endpoints::analyze_github,
+            endpoints::analyze_github_deep,
+            endpoints::get_github_profile,
+            endpoints::get_github_profile_deep,
         ])
         .launch()
         .await?;

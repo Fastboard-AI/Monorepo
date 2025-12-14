@@ -2,6 +2,11 @@
 -- Run this in your Neon SQL console: https://console.neon.tech
 
 -- ============================================
+-- Enable pgvector extension (for embeddings)
+-- ============================================
+CREATE EXTENSION IF NOT EXISTS vector;
+
+-- ============================================
 -- Teams table
 -- ============================================
 CREATE TABLE IF NOT EXISTS teams (
@@ -28,6 +33,7 @@ CREATE TABLE IF NOT EXISTS team_members (
   linkedin VARCHAR,
   website VARCHAR,
   code_characteristics JSONB DEFAULT NULL,
+  github_stats JSONB DEFAULT NULL,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -36,6 +42,7 @@ CREATE TABLE IF NOT EXISTS team_members (
 -- ALTER TABLE team_members ADD COLUMN IF NOT EXISTS linkedin VARCHAR;
 -- ALTER TABLE team_members ADD COLUMN IF NOT EXISTS website VARCHAR;
 -- ALTER TABLE team_members ADD COLUMN IF NOT EXISTS code_characteristics JSONB DEFAULT NULL;
+-- ALTER TABLE team_members ADD COLUMN IF NOT EXISTS github_stats JSONB DEFAULT NULL;
 
 -- ============================================
 -- Jobs table
@@ -103,6 +110,23 @@ CREATE TABLE IF NOT EXISTS job_candidates (
 );
 
 -- ============================================
+-- Code Embeddings table (ephemeral - for analysis sessions)
+-- ============================================
+CREATE TABLE IF NOT EXISTS code_embeddings (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  analysis_id UUID NOT NULL,
+  username VARCHAR NOT NULL,
+  repo_name VARCHAR NOT NULL,
+  file_path VARCHAR NOT NULL,
+  line_start INT NOT NULL,
+  line_end INT NOT NULL,
+  language VARCHAR,
+  content TEXT NOT NULL,
+  embedding vector(768),
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- ============================================
 -- Indexes for performance
 -- ============================================
 CREATE INDEX IF NOT EXISTS idx_team_members_team_id ON team_members(team_id);
@@ -113,6 +137,8 @@ CREATE INDEX IF NOT EXISTS idx_jobs_created_at ON jobs(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_sourced_candidates_created_at ON sourced_candidates(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_job_candidates_job_id ON job_candidates(job_id);
 CREATE INDEX IF NOT EXISTS idx_job_candidates_candidate_id ON job_candidates(candidate_id);
+CREATE INDEX IF NOT EXISTS idx_code_embeddings_analysis_id ON code_embeddings(analysis_id);
+CREATE INDEX IF NOT EXISTS idx_code_embeddings_embedding ON code_embeddings USING ivfflat (embedding vector_cosine_ops) WITH (lists = 100);
 
 -- ============================================
 -- Done!
@@ -124,3 +150,4 @@ CREATE INDEX IF NOT EXISTS idx_job_candidates_candidate_id ON job_candidates(can
 --   - candidates
 --   - sourced_candidates
 --   - job_candidates
+--   - code_embeddings (ephemeral)

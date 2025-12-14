@@ -425,6 +425,81 @@ Analyze a GitHub user's coding style via their commit history. This is more accu
 
 ---
 
+### GitHub Analysis (Deep)
+
+#### POST /api/github/analyze/:username
+Basic analysis - fetches 5 repos, analyzes ~30 files.
+
+**Response:**
+```json
+{
+  "username": "octocat",
+  "profile": {
+    "name": "The Octocat",
+    "bio": "GitHub mascot",
+    "avatar_url": "https://...",
+    "public_repos": 8,
+    "followers": 1000,
+    "following": 10,
+    "created_at": "2011-01-25T00:00:00Z"
+  },
+  "repositories": [...],
+  "ai_analysis": {
+    "ai_detection_score": 65.0,
+    "ai_proficiency_score": 70.0,
+    "code_authenticity_score": 55.0,
+    "analysis_details": {
+      "patterns_detected": ["..."],
+      "confidence": 0.8,
+      "reasoning": "..."
+    }
+  },
+  "languages": {"TypeScript": 40, "Rust": 30, "Python": 30},
+  "analyzed_at": "2024-01-01T00:00:00Z"
+}
+```
+
+#### POST /api/github/analyze/:username/deep
+Deep analysis - scans more repos, categorizes code excerpts by patterns.
+
+**Response:** Same as above, plus:
+```json
+{
+  "code_excerpts": {
+    "error_handling": [{"repo_name": "...", "file_path": "...", "content": "..."}],
+    "async_patterns": [...],
+    "testing": [...],
+    "logging": [...],
+    "class_structure": [...],
+    "functional_patterns": [...],
+    "validation": [...],
+    "naming_style": [...]
+  },
+  "analysis_metadata": {
+    "chunks_analyzed": 25,
+    "total_lines": 5000,
+    "repos_analyzed": 5,
+    "languages_detected": ["Rust", "TypeScript"]
+  }
+}
+```
+
+#### GET /api/github/profile/:username
+AI-generated developer personality profile.
+
+**Response:**
+```json
+{
+  "username": "octocat",
+  "profile": "A pragmatic developer who prefers..."
+}
+```
+
+#### GET /api/github/profile/:username/deep
+Deep profile with code excerpts for more specific observations.
+
+---
+
 ## Code Characteristics
 
 The AI analyzes repositories and returns 10 metrics:
@@ -458,12 +533,19 @@ backend/
 │   │   └── characteristics.rs     # CodeCharacteristics struct
 │   ├── github/
 │   │   ├── mod.rs                 # GitHub module exports
-│   │   └── api.rs                 # GitHub API client (repos, commits)
+│   │   ├── api.rs                 # GitHub API client (repos, commits, trees, files)
+│   │   ├── analyze.rs             # GitHub user analysis (basic + deep)
+│   │   ├── stats.rs               # GitHubStats, AnalysisMetadata structs
+│   │   ├── ai_analysis.rs         # AI usage detection (Gemini)
+│   │   ├── ai_summary.rs          # Developer profile generation
+│   │   ├── embeddings.rs          # Code chunking utilities
+│   │   └── semantic_search.rs     # Code categorization by keywords
 │   └── endpoints/
 │       ├── mod.rs                 # Endpoint exports
 │       ├── ep_add_to_db.rs        # Add candidate endpoint
 │       ├── ep_analyse_repo.rs     # Analyze repo endpoint
 │       ├── ep_analyse_github.rs   # Analyze GitHub user endpoint
+│       ├── ep_github_analysis.rs  # Deep GitHub analysis endpoints
 │       ├── ep_jobs.rs             # Jobs CRUD
 │       ├── ep_teams.rs            # Teams CRUD + members
 │       ├── ep_sourcing.rs         # Candidate sourcing (mock)

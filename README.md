@@ -165,6 +165,8 @@ Service runs at http://localhost:8002
 | POST | `/add_to_db` | Add candidate with code analysis |
 | POST | `/analyse_repo` | Analyze GitHub repo (clones repo) |
 | POST | `/analyse_github` | Analyze GitHub user (full file analysis) |
+| POST | `/github/analyze/:username` | Full GitHub analysis with AI usage detection |
+| GET | `/github/profile/:username` | AI-generated developer profile (coding style, personality, quirks) |
 
 ### Web Scraping Service (port 8002)
 
@@ -183,14 +185,56 @@ Service runs at http://localhost:8002
 
 ## Features
 
+### GitHub AI Usage Analysis
+
+Analyze any GitHub user to understand their coding patterns, AI tool usage, and generate a personalized developer profile.
+
+**API Endpoints:**
+- `POST /api/github/analyze/{username}` - Basic analysis with AI scores (5 repos, 5K lines)
+- `POST /api/github/analyze/{username}/deep` - Deep analysis with code categorization
+- `GET /api/github/profile/{username}` - AI-generated developer personality profile
+- `GET /api/github/profile/{username}/deep` - Deep profile with code excerpts and specific observations
+
+**AI Usage Scores (0-100):**
+| Score | Description |
+|-------|-------------|
+| `ai_detection_score` | Likelihood code was AI-generated (higher = more AI patterns) |
+| `ai_proficiency_score` | How effectively they use AI tools |
+| `code_authenticity_score` | Human authorship indicators (higher = more personal style) |
+
+**What the AI Looks For:**
+- *AI Detection*: Overly consistent formatting, generic variable names, textbook-style patterns, excessive boilerplate
+- *AI Proficiency*: Smart delegation to AI, human refinement of AI output, good integration
+- *Authenticity*: Personal coding quirks, style evolution, domain-specific shortcuts, opinionated decisions
+
+**Developer Profile Generation:**
+The `/github/profile` endpoint generates a warm, observational profile describing:
+- Coding style & personality (verbose/concise, pragmatic/elegant, paradigm preferences)
+- Interests & passions (what excites them based on their repos)
+- Quirks & characteristics (naming habits, project structure, distinctive patterns)
+- How they work with (or without) AI tools
+
+**Auto-Trigger:**
+When adding or updating a team member with a GitHub username, the analysis runs automatically in the background and stores results in `github_stats`.
+
+---
+
 ### Team Code Analysis
 
 When adding team members with a GitHub username, the system analyzes their coding style using **full source file analysis**:
 
+**Basic Analysis (default):**
 1. Fetches up to 30 code files across 5 repositories
 2. Filters to actual code files (`.ts`, `.py`, `.rs`, `.go`, etc.)
 3. Excludes `node_modules/`, `vendor/`, minified files
 4. Sends up to 5,000 lines to Gemini AI for analysis
+
+**Deep Analysis (keyword categorization):**
+1. Analyzes code files across non-fork repositories
+2. Filters out config files, tests, and generated code
+3. Categorizes code by keywords (error handling, async patterns, logging, etc.)
+4. Extracts representative code excerpts for each category
+5. Provides analysis metadata (files analyzed, lines, languages)
 
 **Code Characteristics Analyzed:**
 - Function size & complexity

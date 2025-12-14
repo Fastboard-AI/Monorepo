@@ -1,4 +1,4 @@
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 const GITHUB_API: &str = "https://api.github.com";
 
@@ -9,7 +9,7 @@ pub struct GitHubRepo {
     pub fork: bool,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Serialize, Clone)]
 pub struct RepoOwner {
     pub login: String,
 }
@@ -57,6 +57,35 @@ pub struct TreeItem {
 pub struct FileContent {
     pub content: Option<String>,
     pub encoding: Option<String>,
+}
+
+// Extended repo data for full analysis
+#[derive(Deserialize, Serialize, Clone)]
+pub struct GitHubRepoFull {
+    pub name: String,
+    pub owner: RepoOwner,
+    pub fork: bool,
+    pub description: Option<String>,
+    pub stargazers_count: u32,
+    pub forks_count: u32,
+    pub watchers_count: u32,
+    pub language: Option<String>,
+    pub size: u32,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+// GitHub user profile
+#[derive(Deserialize, Serialize, Clone)]
+pub struct GitHubUser {
+    pub login: String,
+    pub name: Option<String>,
+    pub bio: Option<String>,
+    pub avatar_url: String,
+    pub public_repos: u32,
+    pub followers: u32,
+    pub following: u32,
+    pub created_at: String,
 }
 
 pub async fn get_user_repos(
@@ -156,7 +185,9 @@ pub async fn get_file_content(
     path: &str,
     token: &str,
 ) -> Result<String, Box<dyn std::error::Error + Send + Sync>> {
-    let client = reqwest::Client::new();
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(10))
+        .build()?;
     let url = format!(
         "{}/repos/{}/{}/contents/{}",
         GITHUB_API, owner, repo, path
@@ -182,4 +213,68 @@ pub async fn get_file_content(
     } else {
         Ok(String::new())
     }
+}
+
+/// Get user profile data
+pub async fn get_user_profile(
+    username: &str,
+    token: &str,
+) -> Result<GitHubUser, Box<dyn std::error::Error + Send + Sync>> {
+    let client = reqwest::Client::new();
+    let url = format!("{}/users/{}", GITHUB_API, username);
+
+    let user: GitHubUser = client
+        .get(&url)
+        .header("Authorization", format!("Bearer {}", token))
+        .header("User-Agent", "FastboardAI")
+        .send()
+        .await?
+        .json()
+        .await?;
+
+    Ok(user)
+}
+
+/// Get all user repos with full metadata (including forks)
+pub async fn get_user_repos_full(
+    username: &str,
+    token: &str,
+) -> Result<Vec<GitHubRepoFull>, Box<dyn std::error::Error + Send + Sync>> {
+    let client = reqwest::Client::new();
+    let url = format!("{}/users/{}/repos?sort=updated&per_page=30", GITHUB_API, username);
+
+    let repos: Vec<GitHubRepoFull> = client
+        .get(&url)
+        .header("Authorization", format!("Bearer {}", token))
+        .header("User-Agent", "FastboardAI")
+        .send()
+        .await?
+        .json()
+        .await?;
+
+    Ok(repos)
+}
+
+/// Get commit count for a user in a specific repo
+pub async fn get_repo_commit_count(
+    owner: &str,
+    repo: &str,
+    author: &str,
+    token: &str,
+) -> Result<u32, Box<dyn std::error::Error + Send + Sync>> {
+    let client = reqwest::Client::new();
+    let url = format!(
+        "{}/repos/{}/{}/commits?author={}&per_page=100",
+        GITHUB_API, owner, repo, author
+    );
+
+    let response = client
+        .get(&url)
+        .header("Authorization", format!("Bearer {}", token))
+        .header("User-Agent", "FastboardAI")
+        .send()
+        .await?;
+
+    let commits: Vec<GitHubCommit> = response.json().await.unwrap_or_default();
+    Ok(commits.len() as u32)
 }

@@ -61,6 +61,7 @@ struct TeamMemberRow {
     linkedin: Option<String>,
     website: Option<String>,
     code_characteristics: Option<serde_json::Value>,
+    github_stats: Option<serde_json::Value>,
 }
 
 #[derive(Serialize)]
@@ -114,7 +115,7 @@ async fn recalculate_and_update_team_score(
     db: &mut Connection<MainDatabase>
 ) {
     let rows = sqlx::query(
-        "SELECT id, name, role, skills, experience_level, work_style, github, linkedin, website, code_characteristics FROM team_members WHERE team_id = $1"
+        "SELECT id, name, role, skills, experience_level, work_style, github, linkedin, website, code_characteristics, github_stats FROM team_members WHERE team_id = $1"
     )
     .bind(team_id)
     .fetch_all(&mut ***db)
@@ -139,6 +140,7 @@ async fn recalculate_and_update_team_score(
             linkedin: m.get("linkedin"),
             website: m.get("website"),
             code_characteristics: m.get("code_characteristics"),
+            github_stats: m.get("github_stats"),
         }
     }).collect();
 
@@ -166,7 +168,7 @@ pub async fn get_teams(mut db: Connection<MainDatabase>) -> RawJson<String> {
         let team_id: uuid::Uuid = r.get("id");
 
         let members_rows = sqlx::query(
-            r#"SELECT id, name, role, skills, experience_level, work_style, github, linkedin, website, code_characteristics FROM team_members WHERE team_id = $1"#
+            r#"SELECT id, name, role, skills, experience_level, work_style, github, linkedin, website, code_characteristics, github_stats FROM team_members WHERE team_id = $1"#
         )
         .bind(team_id)
         .fetch_all(&mut **db)
@@ -193,6 +195,7 @@ pub async fn get_teams(mut db: Connection<MainDatabase>) -> RawJson<String> {
                     linkedin: m.get("linkedin"),
                     website: m.get("website"),
                     code_characteristics: m.get("code_characteristics"),
+                    github_stats: m.get("github_stats"),
                 }
             })
             .collect();
@@ -224,7 +227,7 @@ pub async fn get_team(id: &str, mut db: Connection<MainDatabase>) -> RawJson<Str
     .unwrap();
 
     let members_rows = sqlx::query(
-        r#"SELECT id, name, role, skills, experience_level, work_style, github, linkedin, website, code_characteristics FROM team_members WHERE team_id = $1"#
+        r#"SELECT id, name, role, skills, experience_level, work_style, github, linkedin, website, code_characteristics, github_stats FROM team_members WHERE team_id = $1"#
     )
     .bind(uuid)
     .fetch_all(&mut **db)
@@ -251,6 +254,7 @@ pub async fn get_team(id: &str, mut db: Connection<MainDatabase>) -> RawJson<Str
                 linkedin: m.get("linkedin"),
                 website: m.get("website"),
                 code_characteristics: m.get("code_characteristics"),
+                github_stats: m.get("github_stats"),
             }
         })
         .collect();
@@ -356,7 +360,7 @@ pub async fn add_team_member<'a>(team_id: &str, data: json::Json<CreateTeamMembe
     .await
     .unwrap();
 
-    // Spawn background task for code analysis if GitHub is provided
+    // Spawn background task for code analysis and GitHub stats if GitHub is provided
     if let Some(github) = data.github {
         let github = github.to_string();
         let member_id = id.to_string();
@@ -370,11 +374,25 @@ pub async fn add_team_member<'a>(team_id: &str, data: json::Json<CreateTeamMembe
                     .await
                     .ok();
 
-                if let Some(chars) = chars {
-                    if let Ok(pool) = sqlx::PgPool::connect(&db_url).await {
-                        let member_uuid = uuid::Uuid::parse_str(&member_id).unwrap();
+                // Get GitHub stats with AI analysis
+                let stats = crate::github::analyze::analyze_github_user(&github, &token)
+                    .await
+                    .ok();
+
+                if let Ok(pool) = sqlx::PgPool::connect(&db_url).await {
+                    let member_uuid = uuid::Uuid::parse_str(&member_id).unwrap();
+
+                    if let Some(chars) = chars {
                         let _ = sqlx::query("UPDATE team_members SET code_characteristics = $1 WHERE id = $2")
                             .bind(serde_json::to_value(&chars).unwrap())
+                            .bind(member_uuid)
+                            .execute(&pool)
+                            .await;
+                    }
+
+                    if let Some(stats) = stats {
+                        let _ = sqlx::query("UPDATE team_members SET github_stats = $1 WHERE id = $2")
+                            .bind(serde_json::to_value(&stats).unwrap())
                             .bind(member_uuid)
                             .execute(&pool)
                             .await;
@@ -398,6 +416,7 @@ pub async fn add_team_member<'a>(team_id: &str, data: json::Json<CreateTeamMembe
         linkedin: data.linkedin.map(String::from),
         website: data.website.map(String::from),
         code_characteristics: None, // Will be populated async
+        github_stats: None, // Will be populated async
     };
 
     RawJson(serde_json::to_string(&member).unwrap())
@@ -481,7 +500,7 @@ pub async fn update_team_member<'a>(
             .bind(member_uuid)
             .execute(&mut **db).await.unwrap();
 
-        // Trigger background code analysis if GitHub changed
+        // Trigger background code analysis and GitHub stats if GitHub changed
         if let Some(gh) = github_val {
             let gh = gh.to_string();
             let mid = member_id.to_string();
@@ -494,11 +513,24 @@ pub async fn update_team_member<'a>(
                         .await
                         .ok();
 
-                    if let Some(chars) = chars {
-                        if let Ok(pool) = sqlx::PgPool::connect(&db_url).await {
-                            let muuid = uuid::Uuid::parse_str(&mid).unwrap();
+                    let stats = crate::github::analyze::analyze_github_user(&gh, &token)
+                        .await
+                        .ok();
+
+                    if let Ok(pool) = sqlx::PgPool::connect(&db_url).await {
+                        let muuid = uuid::Uuid::parse_str(&mid).unwrap();
+
+                        if let Some(chars) = chars {
                             let _ = sqlx::query("UPDATE team_members SET code_characteristics = $1 WHERE id = $2")
                                 .bind(serde_json::to_value(&chars).unwrap())
+                                .bind(muuid)
+                                .execute(&pool)
+                                .await;
+                        }
+
+                        if let Some(stats) = stats {
+                            let _ = sqlx::query("UPDATE team_members SET github_stats = $1 WHERE id = $2")
+                                .bind(serde_json::to_value(&stats).unwrap())
                                 .bind(muuid)
                                 .execute(&pool)
                                 .await;
@@ -529,7 +561,7 @@ pub async fn update_team_member<'a>(
 
     // Fetch and return updated member
     let row = sqlx::query(
-        r#"SELECT id, name, role, skills, experience_level, work_style, github, linkedin, website, code_characteristics FROM team_members WHERE id = $1"#
+        r#"SELECT id, name, role, skills, experience_level, work_style, github, linkedin, website, code_characteristics, github_stats FROM team_members WHERE id = $1"#
     )
     .bind(member_uuid)
     .fetch_one(&mut **db)
@@ -554,6 +586,7 @@ pub async fn update_team_member<'a>(
         linkedin: row.get("linkedin"),
         website: row.get("website"),
         code_characteristics: row.get("code_characteristics"),
+        github_stats: row.get("github_stats"),
     };
 
     RawJson(serde_json::to_string(&member).unwrap())
