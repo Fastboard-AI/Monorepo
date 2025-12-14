@@ -369,4 +369,47 @@ export const api = {
   // Candidates count
   getCandidatesCount: (): Promise<{ count: number }> =>
     fetchJson(`${API_BASE}/api/candidates/count`),
+
+  // Resume parsing
+  parseResume: async (file: File): Promise<ParsedResume> => {
+    const response = await fetch(`${API_BASE}/api/resumes/parse`, {
+      method: "POST",
+      headers: {
+        "Content-Type": file.type || "application/octet-stream",
+      },
+      body: file,
+    });
+    if (!response.ok) {
+      throw new Error(`API error: ${response.status} ${response.statusText}`);
+    }
+    return response.json();
+  },
 };
+
+// Resume parsing types
+export interface ParsedResume {
+  name: string;
+  email: string | null;
+  phone: string | null;
+  location: string | null;
+  title: string | null;
+  summary: string | null;
+  skills: { name: string; level: string }[];
+  experience: {
+    title: string;
+    company: string;
+    duration: string;
+    description: string | null;
+  }[];
+  education: {
+    degree: string;
+    institution: string;
+    year: string;
+    field: string | null;
+  }[];
+  github_url: string | null;
+  linkedin_url: string | null;
+  website_url: string | null;
+  other_links: string[];
+  error?: string;
+}

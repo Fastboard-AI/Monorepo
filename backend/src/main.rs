@@ -53,6 +53,9 @@ async fn main() -> Result<(), Box<dyn Error>> {
             // Take-Home Projects
             endpoints::generate_take_home,
             endpoints::get_take_home,
+            // Resume Parsing
+            endpoints::parse_resume,
+            endpoints::parse_resume_text,
         ])
         .launch()
         .await?;

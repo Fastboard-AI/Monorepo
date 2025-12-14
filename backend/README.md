@@ -388,6 +388,66 @@ Get total count of candidates in the database.
 }
 ```
 
+---
+
+### Resume Parsing
+
+#### POST /api/resumes/parse
+Parse a resume file (PDF or DOCX) and extract structured candidate data using AI.
+
+**Request:** Send file as binary body with appropriate Content-Type header.
+
+**Response:**
+```json
+{
+  "name": "John Doe",
+  "email": "john@example.com",
+  "phone": "+1234567890",
+  "location": "Sydney, Australia",
+  "title": "Senior Software Engineer",
+  "summary": "Experienced developer with 8+ years...",
+  "skills": [
+    {"name": "Python", "level": "expert"},
+    {"name": "React", "level": "advanced"}
+  ],
+  "experience": [
+    {
+      "title": "Senior Engineer",
+      "company": "Tech Corp",
+      "duration": "2020 - Present",
+      "description": "Led development of..."
+    }
+  ],
+  "education": [
+    {
+      "degree": "B.S. Computer Science",
+      "institution": "University of Sydney",
+      "year": "2016",
+      "field": "Computer Science"
+    }
+  ],
+  "github_url": "https://github.com/johndoe",
+  "linkedin_url": "https://linkedin.com/in/johndoe",
+  "website_url": "https://johndoe.dev",
+  "other_links": ["https://blog.johndoe.dev"]
+}
+```
+
+**Extracted Links:**
+- `github_url`: GitHub profile URL (for code analysis)
+- `linkedin_url`: LinkedIn profile URL
+- `website_url`: Personal website/portfolio (for scraping)
+- `other_links`: Any other relevant URLs found
+
+#### POST /api/resumes/parse-text
+Parse resume from raw text (alternative to file upload).
+
+**Request:** Plain text body containing resume content.
+
+**Response:** Same as `/api/resumes/parse`.
+
+---
+
 #### POST /api/candidates
 Create a new candidate (used by AI Sourcing & Resume Matcher).
 
@@ -860,7 +920,8 @@ backend/
 │       ├── ep_sourcing.rs         # Candidate sourcing with AI filtering
 │       ├── ep_candidates.rs       # Candidates CRUD + job linking
 │       ├── ep_match_candidates.rs # (WIP) Matching endpoint
-│       └── ep_take_home.rs        # Take-home project generation endpoints
+│       ├── ep_take_home.rs        # Take-home project generation endpoints
+│       └── ep_resumes.rs          # Resume parsing (PDF/DOCX) with AI extraction
 ├── schema.sql                     # Database schema (run in Neon)
 ├── Cargo.toml                     # Dependencies
 ├── Rocket.toml                    # Rocket configuration
