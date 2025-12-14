@@ -1,6 +1,6 @@
 "use client";
 
-import { X, Pencil, Github, Linkedin, Globe, Briefcase, GraduationCap } from "lucide-react";
+import { X, Pencil, Github, Linkedin, Globe, Briefcase, FileCode, Code2 } from "lucide-react";
 import type { TeamMember } from "../types";
 import { CodeCharacteristicsRadar } from "./CodeCharacteristicsRadar";
 
@@ -178,9 +178,26 @@ export function TeamMemberDetailModal({
           {member.codeCharacteristics ? (
             <div className="rounded-xl border border-indigo-100 bg-indigo-50/50 p-4">
               <h3 className="mb-2 text-sm font-medium text-slate-700">Code Style Analysis</h3>
-              <p className="mb-4 text-xs text-slate-500">
-                Based on analysis of public GitHub repositories
-              </p>
+              {/* Confidence metrics */}
+              <div className="mb-4 flex flex-wrap items-center gap-3 text-xs text-slate-500">
+                {member.codeCharacteristics.files_analyzed !== undefined && (
+                  <span className="inline-flex items-center gap-1">
+                    <FileCode className="h-3 w-3" />
+                    {member.codeCharacteristics.files_analyzed} files analyzed
+                  </span>
+                )}
+                {member.codeCharacteristics.total_lines_analyzed !== undefined && (
+                  <span className="inline-flex items-center gap-1">
+                    <Code2 className="h-3 w-3" />
+                    {member.codeCharacteristics.total_lines_analyzed.toLocaleString()} lines
+                  </span>
+                )}
+                {member.codeCharacteristics.languages_detected && member.codeCharacteristics.languages_detected.length > 0 && (
+                  <span className="text-indigo-600">
+                    {member.codeCharacteristics.languages_detected.join(", ")}
+                  </span>
+                )}
+              </div>
               <CodeCharacteristicsRadar characteristics={member.codeCharacteristics} />
             </div>
           ) : member.github ? (

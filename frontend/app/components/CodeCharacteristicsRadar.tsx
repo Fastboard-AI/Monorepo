@@ -16,7 +16,33 @@ interface CodeCharacteristicsRadarProps {
   className?: string;
 }
 
-const CHARACTERISTIC_LABELS: Record<keyof CodeCharacteristics, string> = {
+// Core metric keys (excluding confidence metrics)
+type CoreMetricKey =
+  | "avg_lines_per_function"
+  | "functional_vs_oop_ratio"
+  | "recursion_vs_loop_ratio"
+  | "dependency_coupling_index"
+  | "modularity_index_score"
+  | "avg_nesting_depth"
+  | "abstraction_layer_count"
+  | "immutability_score"
+  | "error_handling_centralization_score"
+  | "test_structure_modularity_ratio";
+
+const CORE_METRIC_KEYS: CoreMetricKey[] = [
+  "avg_lines_per_function",
+  "functional_vs_oop_ratio",
+  "recursion_vs_loop_ratio",
+  "dependency_coupling_index",
+  "modularity_index_score",
+  "avg_nesting_depth",
+  "abstraction_layer_count",
+  "immutability_score",
+  "error_handling_centralization_score",
+  "test_structure_modularity_ratio",
+];
+
+const CHARACTERISTIC_LABELS: Record<CoreMetricKey, string> = {
   avg_lines_per_function: "Function Size",
   functional_vs_oop_ratio: "Functional vs OOP",
   recursion_vs_loop_ratio: "Recursion vs Loops",
@@ -29,7 +55,7 @@ const CHARACTERISTIC_LABELS: Record<keyof CodeCharacteristics, string> = {
   test_structure_modularity_ratio: "Test Structure",
 };
 
-const CHARACTERISTIC_DESCRIPTIONS: Record<keyof CodeCharacteristics, string> = {
+const CHARACTERISTIC_DESCRIPTIONS: Record<CoreMetricKey, string> = {
   avg_lines_per_function: "Average lines per function (inverted: lower is better)",
   functional_vs_oop_ratio: "Balance between functional and OOP paradigms",
   recursion_vs_loop_ratio: "Preference for recursion over loops",
@@ -43,7 +69,7 @@ const CHARACTERISTIC_DESCRIPTIONS: Record<keyof CodeCharacteristics, string> = {
 };
 
 // Normalize values to 0-100 scale for display
-function normalizeValue(key: keyof CodeCharacteristics, value: number): number {
+function normalizeValue(key: CoreMetricKey, value: number): number {
   // Some metrics need to be inverted (e.g., lower lines per function is better)
   switch (key) {
     case "avg_lines_per_function":
@@ -65,11 +91,12 @@ export function CodeCharacteristicsRadar({
   characteristics,
   className = "",
 }: CodeCharacteristicsRadarProps) {
-  const data = Object.entries(characteristics).map(([key, value]) => ({
-    characteristic: CHARACTERISTIC_LABELS[key as keyof CodeCharacteristics],
-    value: normalizeValue(key as keyof CodeCharacteristics, value),
-    rawValue: value,
-    description: CHARACTERISTIC_DESCRIPTIONS[key as keyof CodeCharacteristics],
+  // Only map core metrics (exclude confidence fields)
+  const data = CORE_METRIC_KEYS.map((key) => ({
+    characteristic: CHARACTERISTIC_LABELS[key],
+    value: normalizeValue(key, characteristics[key]),
+    rawValue: characteristics[key],
+    description: CHARACTERISTIC_DESCRIPTIONS[key],
   }));
 
   return (

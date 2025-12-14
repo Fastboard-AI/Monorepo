@@ -73,6 +73,10 @@ export interface CodeCharacteristics {
   immutability_score: number;
   error_handling_centralization_score: number;
   test_structure_modularity_ratio: number;
+  // Confidence metrics
+  files_analyzed?: number;
+  total_lines_analyzed?: number;
+  languages_detected?: string[];
 }
 
 // Team member = existing employee (not a candidate)
