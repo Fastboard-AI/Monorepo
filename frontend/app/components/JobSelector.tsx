@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from "react";
 import { ChevronDown, Briefcase, MapPin, Check } from "lucide-react";
 import type { Job } from "../types";
+import { getSkillName } from "../types";
 
 interface JobSelectorProps {
   jobs: Job[];
@@ -169,14 +170,17 @@ export function JobSelector({
                     </div>
                     {job.requiredSkills.length > 0 && (
                       <div className="mt-1.5 flex flex-wrap gap-1">
-                        {job.requiredSkills.slice(0, 3).map((skill) => (
-                          <span
-                            key={skill}
-                            className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-600"
-                          >
-                            {skill}
-                          </span>
-                        ))}
+                        {job.requiredSkills.slice(0, 3).map((skill, index) => {
+                          const skillName = getSkillName(skill);
+                          return (
+                            <span
+                              key={`${skillName}-${index}`}
+                              className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-600"
+                            >
+                              {skillName}
+                            </span>
+                          );
+                        })}
                         {job.requiredSkills.length > 3 && (
                           <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-500">
                             +{job.requiredSkills.length - 3}

@@ -18,7 +18,8 @@ import { CreateJobModal } from "../../components/CreateJobModal";
 import { EditJobModal } from "../../components/EditJobModal";
 import { DeleteConfirmModal } from "../../components/DeleteConfirmModal";
 import { useJobs } from "../../hooks/useJobs";
-import type { Job, ExperienceLevel, JobStatus } from "../../types";
+import type { Job, ExperienceLevel, JobStatus, JobSkill } from "../../types";
+import { getSkillName } from "../../types";
 
 export default function JobsPage() {
   const { isLoaded, isSignedIn } = useAuth();
@@ -50,7 +51,7 @@ export default function JobsPage() {
       (j) =>
         j.title.toLowerCase().includes(query) ||
         j.location?.toLowerCase().includes(query) ||
-        j.requiredSkills.some((s) => s.toLowerCase().includes(query))
+        j.requiredSkills.some((s) => getSkillName(s).toLowerCase().includes(query))
     );
   }, [jobs, searchQuery]);
 
@@ -76,7 +77,7 @@ export default function JobsPage() {
       title: string;
       description?: string;
       location?: string;
-      requiredSkills?: string[];
+      requiredSkills?: JobSkill[];
       experienceLevel?: ExperienceLevel;
     }) => {
       const newJob = await createJob(data);
@@ -97,7 +98,7 @@ export default function JobsPage() {
         title?: string;
         description?: string;
         location?: string;
-        requiredSkills?: string[];
+        requiredSkills?: JobSkill[];
         experienceLevel?: ExperienceLevel;
         status?: JobStatus;
       }

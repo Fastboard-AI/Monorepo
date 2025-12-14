@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import type { Job, JobStatus, ExperienceLevel } from "../types";
+import type { Job, JobStatus, ExperienceLevel, JobSkill } from "../types";
 import { api, ApiJob } from "../lib/api";
 
 // Convert API response to frontend Job type
@@ -25,7 +25,7 @@ export interface CreateJobData {
   title: string;
   description?: string;
   location?: string;
-  requiredSkills?: string[];
+  requiredSkills?: JobSkill[];
   experienceLevel?: ExperienceLevel;
 }
 
@@ -33,7 +33,7 @@ export interface UpdateJobData {
   title?: string;
   description?: string;
   location?: string;
-  requiredSkills?: string[];
+  requiredSkills?: JobSkill[];
   experienceLevel?: ExperienceLevel;
   status?: JobStatus;
 }

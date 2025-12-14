@@ -11,6 +11,9 @@ import {
   ChevronUp,
   GitCompare,
   Check,
+  Loader2,
+  AlertCircle,
+  CheckCircle2,
 } from "lucide-react";
 import type { Candidate } from "../types";
 import { ScoreRing } from "./ScoreRing";
@@ -97,9 +100,30 @@ export function SelectableCandidateCard({
           <div className="min-w-0 flex-1">
             <div className="flex items-start justify-between gap-2">
               <div>
-                <h3 className="font-semibold text-slate-900 truncate">
-                  {candidate.name}
-                </h3>
+                <div className="flex items-center gap-2">
+                  <h3 className="font-semibold text-slate-900 truncate">
+                    {candidate.name}
+                  </h3>
+                  {/* Analysis Status Indicator */}
+                  {candidate.analysisStatus === "analyzing" && (
+                    <span className="flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700">
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                      Analyzing
+                    </span>
+                  )}
+                  {candidate.analysisStatus === "complete" && candidate.developerProfile && (
+                    <span className="flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700" title="GitHub profile analyzed">
+                      <CheckCircle2 className="h-3 w-3" />
+                      Profiled
+                    </span>
+                  )}
+                  {candidate.analysisStatus === "failed" && (
+                    <span className="flex items-center gap-1 rounded-full bg-red-50 px-2 py-0.5 text-xs font-medium text-red-700" title="Analysis failed">
+                      <AlertCircle className="h-3 w-3" />
+                      Failed
+                    </span>
+                  )}
+                </div>
                 <p className="text-sm text-slate-600">{candidate.title}</p>
               </div>
               <ScoreRing score={candidate.talentFitScore} size="sm" />

@@ -1,14 +1,23 @@
 use rocket::{post, serde::json};
 use rocket::response::content::RawJson;
+use rocket_db_pools::Connection;
 use serde::{Deserialize, Serialize};
 use rand::Rng;
+use sqlx::Row;
+use crate::db::MainDatabase;
+use crate::matching::{
+    CandidateSkill, CandidateExperience, RequiredSkill, ExplainableScore,
+    skills::calculate_skill_score,
+    experience::calculate_experience_score,
+    team_fit::calculate_team_fit_score,
+    culture::calculate_culture_score,
+    calculate_talent_fit,
+};
 
 #[derive(Deserialize)]
 #[serde(crate = "rocket::serde")]
 pub struct SourcingRequest {
-    #[allow(dead_code)]
     job_id: String,
-    #[allow(dead_code)]
     team_id: Option<String>,
     sources: Vec<String>,
     count: i32,
@@ -60,9 +69,31 @@ struct Links {
 
 #[derive(Serialize)]
 struct ScoreBreakdown {
-    skills: i32,
-    experience: i32,
-    culture: i32,
+    skills: ScoreDetail,
+    experience: ScoreDetail,
+    team_fit: ScoreDetail,
+    culture: ScoreDetail,
+}
+
+#[derive(Serialize)]
+struct ScoreDetail {
+    score: i32,
+    matched: Vec<String>,
+    missing: Vec<String>,
+    bonus: Vec<String>,
+    reasoning: Option<String>,
+}
+
+impl From<ExplainableScore> for ScoreDetail {
+    fn from(e: ExplainableScore) -> Self {
+        ScoreDetail {
+            score: e.score,
+            matched: e.matched,
+            missing: e.missing,
+            bonus: e.bonus,
+            reasoning: e.reasoning,
+        }
+    }
 }
 
 const FIRST_NAMES: &[&str] = &[
@@ -106,7 +137,57 @@ const UNIVERSITIES: &[&str] = &[
     "University of Washington", "UCLA", "UT Austin", "UIUC", "Cornell"
 ];
 
-fn generate_mock_candidate(source: &str) -> SourcingResult {
+/// Job data fetched from database for scoring
+struct JobData {
+    required_skills: Vec<RequiredSkill>,
+    experience_level: String,
+    title: String,
+    description: Option<String>,
+}
+
+/// Team member profile for compatibility scoring
+struct TeamMemberData {
+    developer_profile: Option<String>,
+}
+
+/// Parse required_skills from JSONB - supports both legacy and enhanced formats
+fn parse_required_skills(json_value: &serde_json::Value) -> Vec<RequiredSkill> {
+    match json_value.as_array() {
+        Some(arr) => arr.iter().filter_map(|item| {
+            if let Some(s) = item.as_str() {
+                // Legacy format: just a string
+                Some(RequiredSkill {
+                    name: s.to_string(),
+                    level: Some("intermediate".to_string()),
+                    mandatory: Some(true),
+                })
+            } else if item.is_object() {
+                // Enhanced format: object with name, level, mandatory
+                serde_json::from_value(item.clone()).ok()
+            } else {
+                None
+            }
+        }).collect(),
+        None => vec![],
+    }
+}
+
+/// Intermediate struct for generated candidate data (before async scoring)
+struct GeneratedCandidateData {
+    id: String,
+    name: String,
+    title: String,
+    location: String,
+    skills: Vec<SkillMatch>,
+    candidate_skills: Vec<CandidateSkill>,
+    experience: Vec<Experience>,
+    candidate_experience: Vec<CandidateExperience>,
+    education: Vec<Education>,
+    links: Links,
+    source: String,
+}
+
+fn generate_candidate_data(source: &str) -> GeneratedCandidateData {
     let mut rng = rand::thread_rng();
 
     let first = FIRST_NAMES[rng.gen_range(0..FIRST_NAMES.len())];
@@ -115,28 +196,34 @@ fn generate_mock_candidate(source: &str) -> SourcingResult {
 
     let username = format!("{}{}", first.to_lowercase(), rng.gen_range(100..999));
 
+    // Generate random skills for the mock candidate
     let num_skills = rng.gen_range(4..8);
-    let skills: Vec<SkillMatch> = (0..num_skills)
+    let candidate_skills: Vec<CandidateSkill> = (0..num_skills)
         .map(|_| {
             let skill = SKILLS[rng.gen_range(0..SKILLS.len())];
-            let level = match rng.gen_range(0..3) {
+            let level = match rng.gen_range(0..4) {
                 0 => "expert",
-                1 => "proficient",
-                _ => "familiar",
+                1 => "advanced",
+                2 => "intermediate",
+                _ => "beginner",
             };
-            let match_type = match rng.gen_range(0..3) {
-                0 => "exact",
-                1 => "related",
-                _ => "partial",
-            };
-            SkillMatch {
+            CandidateSkill {
                 name: skill.to_string(),
                 level: level.to_string(),
-                match_type: match_type.to_string(),
             }
         })
         .collect();
 
+    // Convert to SkillMatch for response
+    let skills: Vec<SkillMatch> = candidate_skills.iter()
+        .map(|s| SkillMatch {
+            name: s.name.clone(),
+            level: s.level.clone(),
+            match_type: "exact".to_string(),
+        })
+        .collect();
+
+    // Generate random experience
     let num_exp = rng.gen_range(2..4);
     let experience: Vec<Experience> = (0..num_exp)
         .map(|i| {
@@ -147,6 +234,16 @@ fn generate_mock_candidate(source: &str) -> SourcingResult {
                 duration: format!("{} years", years),
                 description: "Led development of key features and mentored junior engineers.".to_string(),
             }
+        })
+        .collect();
+
+    // Convert to CandidateExperience for scoring
+    let candidate_experience: Vec<CandidateExperience> = experience.iter()
+        .map(|e| CandidateExperience {
+            title: e.title.clone(),
+            company: e.company.clone(),
+            duration: e.duration.clone(),
+            description: Some(e.description.clone()),
         })
         .collect();
 
@@ -174,32 +271,93 @@ fn generate_mock_candidate(source: &str) -> SourcingResult {
         },
     };
 
-    let skills_score = rng.gen_range(70..98);
-    let exp_score = rng.gen_range(65..95);
-    let culture_score = rng.gen_range(60..95);
-    let talent_fit = (skills_score + exp_score + culture_score) / 3;
+    let title = TITLES[rng.gen_range(0..TITLES.len())].to_string();
+    let location = LOCATIONS[rng.gen_range(0..LOCATIONS.len())].to_string();
 
-    SourcingResult {
+    GeneratedCandidateData {
         id: uuid::Uuid::new_v4().to_string(),
         name,
-        title: TITLES[rng.gen_range(0..TITLES.len())].to_string(),
-        location: LOCATIONS[rng.gen_range(0..LOCATIONS.len())].to_string(),
+        title,
+        location,
         skills,
+        candidate_skills,
         experience,
+        candidate_experience,
         education,
         links,
-        talent_fit_score: talent_fit,
-        score_breakdown: ScoreBreakdown {
-            skills: skills_score,
-            experience: exp_score,
-            culture: culture_score,
-        },
         source: source.to_string(),
     }
 }
 
+async fn score_candidate(
+    data: GeneratedCandidateData,
+    job_data: &JobData,
+    team_members: &[TeamMemberData],
+) -> SourcingResult {
+    // 1. Skills score
+    let skills_score = calculate_skill_score(&data.candidate_skills, &job_data.required_skills);
+
+    // 2. Experience score
+    let experience_score = calculate_experience_score(
+        &data.candidate_experience,
+        &job_data.experience_level,
+        Some(&job_data.title),
+    );
+
+    // 3. Team fit score (minimal for now since we don't have full team data)
+    let candidate_skill_names: Vec<String> = data.candidate_skills.iter().map(|s| s.name.clone()).collect();
+    let team_fit_score = calculate_team_fit_score(
+        &candidate_skill_names,
+        None, // candidate_work_style
+        None, // candidate_code_style
+        &[], // team_members - would need full TeamMemberProfile
+        None, // ideal_profile
+    );
+
+    // 4. Culture score (AI-powered)
+    let team_profiles: Vec<String> = team_members.iter()
+        .filter_map(|m| m.developer_profile.clone())
+        .collect();
+    let culture_score = calculate_culture_score(
+        None, // candidate_profile
+        job_data.description.as_deref(),
+        &team_profiles,
+    ).await;
+
+    // 5. Aggregate scores
+    let talent_fit = calculate_talent_fit(
+        skills_score,
+        experience_score,
+        team_fit_score,
+        culture_score,
+        None, // use default weights
+    );
+
+    SourcingResult {
+        id: data.id,
+        name: data.name,
+        title: data.title,
+        location: data.location,
+        skills: data.skills,
+        experience: data.experience,
+        education: data.education,
+        links: data.links,
+        talent_fit_score: talent_fit.total,
+        score_breakdown: ScoreBreakdown {
+            skills: talent_fit.breakdown.skills.into(),
+            experience: talent_fit.breakdown.experience.into(),
+            team_fit: talent_fit.breakdown.team_fit.into(),
+            culture: talent_fit.breakdown.culture.into(),
+        },
+        source: data.source,
+    }
+}
+
 #[post("/sourcing/search", data = "<data>")]
-pub async fn search_candidates(data: json::Json<SourcingRequest>) -> RawJson<String> {
+pub async fn search_candidates(
+    data: json::Json<SourcingRequest>,
+    mut db: Connection<MainDatabase>,
+) -> RawJson<String> {
     let count = data.count.min(50).max(1);
     let sources = if data.sources.is_empty() {
         vec!["github".to_string(), "linkedin".to_string()]
@@ -207,11 +365,76 @@ pub async fn search_candidates(data: json::Json<SourcingRequest>) -> RawJson<Str
         data.sources.clone()
     };
 
-    let mut candidates: Vec<SourcingResult> = Vec::new();
+    // Fetch job data from database
+    let job_data = if let Ok(job_uuid) = uuid::Uuid::parse_str(&data.job_id) {
+        match sqlx::query(
+            r#"SELECT title, description, required_skills, experience_level FROM jobs WHERE id = $1"#
+        )
+        .bind(job_uuid)
+        .fetch_optional(&mut **db)
+        .await
+        {
+            Ok(Some(row)) => {
+                let skills_json: serde_json::Value = row.get("required_skills");
+                JobData {
+                    required_skills: parse_required_skills(&skills_json),
+                    experience_level: row.get::<Option<String>, _>("experience_level")
+                        .unwrap_or_else(|| "any".to_string()),
+                    title: row.get("title"),
+                    description: row.get("description"),
+                }
+            }
+            _ => JobData {
+                required_skills: vec![],
+                experience_level: "any".to_string(),
+                title: "Unknown Position".to_string(),
+                description: None,
+            },
+        }
+    } else {
+        JobData {
+            required_skills: vec![],
+            experience_level: "any".to_string(),
+            title: "Unknown Position".to_string(),
+            description: None,
+        }
+    };
 
-    for i in 0..count {
-        let source = &sources[i as usize % sources.len()];
-        candidates.push(generate_mock_candidate(source));
+    // Fetch team member profiles if team_id is provided
+    let team_members: Vec<TeamMemberData> = if let Some(ref team_id) = data.team_id {
+        if let Ok(team_uuid) = uuid::Uuid::parse_str(team_id) {
+            match sqlx::query(
+                r#"SELECT developer_profile FROM team_members WHERE team_id = $1"#
+            )
+            .bind(team_uuid)
+            .fetch_all(&mut **db)
+            .await
+            {
+                Ok(rows) => rows.iter().map(|r| TeamMemberData {
+                    developer_profile: r.get("developer_profile"),
+                }).collect(),
+                Err(_) => vec![],
+            }
+        } else {
+            vec![]
+        }
+    } else {
+        vec![]
+    };
+
+    // Generate candidate data (sync - uses random number generator)
+    let candidate_data: Vec<GeneratedCandidateData> = (0..count)
+        .map(|i| {
+            let source = &sources[i as usize % sources.len()];
+            generate_candidate_data(source)
+        })
+        .collect();
+
+    // Score each candidate (async - may call AI services)
+    let mut candidates: Vec<SourcingResult> = Vec::new();
+    for data in candidate_data {
+        let candidate = score_candidate(data, &job_data, &team_members).await;
+        candidates.push(candidate);
     }
 
     RawJson(serde_json::to_string(&candidates).unwrap())

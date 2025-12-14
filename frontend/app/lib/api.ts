@@ -9,13 +9,16 @@ async function fetchJson<T>(url: string, options?: RequestInit): Promise<T> {
   return response.json();
 }
 
+// Enhanced skill format (backend accepts both string and object formats)
+export type ApiJobSkill = string | { name: string; level?: string; mandatory?: boolean };
+
 // Jobs API
 export interface ApiJob {
   id: string;
   title: string;
   description: string | null;
   location: string | null;
-  required_skills: string[];
+  required_skills: ApiJobSkill[];
   experience_level: string;
   status: string;
   team_id: string | null;
@@ -28,7 +31,7 @@ export interface CreateJobInput {
   title: string;
   description?: string;
   location?: string;
-  required_skills: string[];
+  required_skills: ApiJobSkill[];
   experience_level: string;
 }
 
@@ -36,7 +39,7 @@ export interface UpdateJobInput {
   title?: string;
   description?: string;
   location?: string;
-  required_skills?: string[];
+  required_skills?: ApiJobSkill[];
   experience_level?: string;
   status?: string;
   team_id?: string;
@@ -208,6 +211,16 @@ export interface ApiCandidate {
   resume_file_name: string | null;
   source: string;
   created_at: string;
+  // GitHub enrichment fields (populated async)
+  code_characteristics: Record<string, unknown> | null;
+  ai_detection_score: number | null;
+  ai_proficiency_score: number | null;
+  code_authenticity_score: number | null;
+  ai_analysis_details: Record<string, unknown> | null;
+  developer_profile: string | null;
+  analysis_metadata: Record<string, unknown> | null;
+  github_stats: Record<string, unknown> | null;
+  analysis_status: string;
 }
 
 export interface CreateCandidateInput {

@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { X, Pencil, MapPin, Code } from "lucide-react";
 import type { Job, ExperienceLevel, JobStatus } from "../types";
+import { getSkillName } from "../types";
 
 interface EditJobModalProps {
   job: Job | null;
@@ -55,7 +56,8 @@ export function EditJobModal({
       setTitle(job.title);
       setDescription(job.description || "");
       setLocation(job.location || "");
-      setSkills(job.requiredSkills);
+      // Convert JobSkill[] to string[] for editing
+      setSkills(job.requiredSkills.map(getSkillName));
       setExperienceLevel(job.experienceLevel);
       setStatus(job.status);
     }

@@ -8,6 +8,7 @@ Rust backend service for AI-powered talent matching, team management, and candid
 - **Database:** PostgreSQL (Neon serverless)
 - **AI:** Google Gemini 2.0 Flash API
 - **Runtime:** Tokio (async)
+- **Matching:** Explainable talent fit scoring with skill, experience, team fit, and culture analysis
 
 ## Prerequisites
 
@@ -210,12 +211,82 @@ Add a member to a team.
     "communication": "sync",
     "collaboration": "collaborative",
     "pace": "fast"
-  }
+  },
+  "github": "https://github.com/bobdev",
+  "linkedin": "https://linkedin.com/in/bobdev",
+  "website": "https://bob.dev"
 }
 ```
 
+All fields except `name`, `role`, `skills`, `experience_level`, and `work_style` are optional.
+
 #### DELETE /api/teams/:team_id/members/:member_id
 Remove a member from a team.
+
+#### PUT /api/teams/:team_id/members/:member_id
+Update a team member.
+
+**Request:**
+```json
+{
+  "name": "Alice Smith",
+  "role": "Senior Engineer",
+  "skills": [{"name": "Rust", "level": "expert"}],
+  "experience_level": "senior",
+  "work_style": {
+    "communication": "async",
+    "collaboration": "balanced",
+    "pace": "steady"
+  },
+  "github": "https://github.com/alicesmith",
+  "linkedin": "https://linkedin.com/in/alicesmith",
+  "website": "https://alice.dev"
+}
+```
+
+**Note:** When a GitHub URL is provided (on create or update), the backend automatically triggers background analysis:
+- **Code Characteristics:** AI-analyzed coding style metrics
+- **GitHub Stats:** Repository analysis with AI detection scores
+- **Developer Profile:** AI-generated personality/work style summary
+
+These fields populate asynchronously and will appear in subsequent GET requests.
+
+**Team Member Response (with analysis):**
+```json
+{
+  "id": "uuid",
+  "name": "Alice Smith",
+  "role": "Senior Engineer",
+  "skills": [{"name": "Rust", "level": "expert"}],
+  "experience_level": "senior",
+  "work_style": {
+    "communication": "async",
+    "collaboration": "balanced",
+    "pace": "steady"
+  },
+  "github": "https://github.com/alicesmith",
+  "linkedin": "https://linkedin.com/in/alicesmith",
+  "website": "https://alice.dev",
+  "code_characteristics": {
+    "avg_lines_per_function": 22.5,
+    "functional_vs_oop_ratio": 0.7,
+    "modularity_index_score": 0.8
+  },
+  "github_stats": { "...full analysis..." },
+  "ai_detection_score": 25.0,
+  "ai_proficiency_score": 85.0,
+  "code_authenticity_score": 90.0,
+  "ai_analysis_details": { "patterns_detected": [], "confidence": 0.9 },
+  "developer_profile": "A pragmatic developer who favors functional patterns...",
+  "analysis_metadata": { "repos_analyzed": 5, "total_lines": 12000 }
+}
+```
+
+**Team Compatibility Score:**
+The `compatibility_score` on teams is automatically calculated when members are added, updated, or removed. It considers:
+- Skill diversity across the team
+- Experience level distribution
+- Work style variety
 
 ---
 
@@ -519,6 +590,103 @@ The AI analyzes repositories and returns 10 metrics:
 
 ---
 
+## Talent Fit Matching System
+
+The backend includes a comprehensive matching module that calculates explainable talent fit scores. Scores are broken down into four weighted components.
+
+### Score Weights (Default)
+
+| Component | Weight | Description |
+|-----------|--------|-------------|
+| Skills | 40% | Technical skill match with synonym and fuzzy matching |
+| Experience | 30% | Years of experience and role relevance |
+| Team Fit | 20% | Skill gap filling, work style, and code style compatibility |
+| Culture | 10% | AI-powered culture fit analysis |
+
+### Skills Matching
+
+The skills matcher supports multiple match types:
+
+| Match Type | Score Multiplier | Description |
+|------------|-----------------|-------------|
+| Exact | 1.0 | Identical skill name |
+| Synonym | 0.95 | Known synonyms (e.g., "js" = "javascript", "k8s" = "kubernetes") |
+| Fuzzy | ~0.9 | Levenshtein similarity >= 80% |
+| Partial | 0.7 | Substring match |
+
+**Skill levels** are weighted: expert (1.0), advanced (0.8), proficient (0.7), intermediate (0.6), familiar (0.5), beginner (0.4).
+
+**Bonus points** are awarded for in-demand skills not required (Rust, Go, Python, TypeScript, React, AWS, Docker, Kubernetes).
+
+### Experience Matching
+
+Experience is scored based on:
+- **Total years** parsed from duration strings ("2 years", "18 months", "2019-2022")
+- **Level requirements:**
+  - Junior: 0-1 years
+  - Mid: 2-4 years
+  - Senior: 5-8 years
+  - Lead/Staff: 7-12 years
+- **Role relevance bonus:** +5 points per matching job title keyword (max +15)
+- **Company prestige bonus:** +3 points for top companies (Google, Meta, Amazon, etc.)
+
+### Team Fit Matching
+
+Team fit considers:
+1. **Skill Gap Filling:** Does the candidate have skills the team lacks?
+2. **Work Style Compatibility:** Communication (sync/async/mixed), collaboration (independent/balanced/collaborative), pace (fast/steady/flexible)
+3. **Code Style Similarity:** Euclidean distance between candidate and team average code characteristics
+
+### Culture Matching
+
+Culture fit uses **Gemini AI** to analyze:
+- Communication style alignment
+- Work approach compatibility
+- Values and priorities match
+- Collaboration preferences
+
+Falls back to heuristic keyword matching if AI is unavailable.
+
+### ExplainableScore Response Format
+
+All matching functions return an `ExplainableScore`:
+
+```json
+{
+  "score": 85,
+  "matched": [
+    "TypeScript (expert) - exact",
+    "React (advanced) - synonym"
+  ],
+  "missing": [
+    "Kubernetes (nice-to-have)"
+  ],
+  "bonus": [
+    "Fills skill gap: Rust",
+    "Top company: Google"
+  ],
+  "reasoning": "Good match, missing 1 nice-to-have"
+}
+```
+
+### TalentFitScore Response Format
+
+The aggregate score combines all components:
+
+```json
+{
+  "total": 82,
+  "breakdown": {
+    "skills": { "score": 90, "matched": [...], "missing": [...], "bonus": [...], "reasoning": "..." },
+    "experience": { "score": 75, "matched": [...], "missing": [...], "bonus": [...], "reasoning": "..." },
+    "team_fit": { "score": 80, "matched": [...], "missing": [...], "bonus": [...], "reasoning": "..." },
+    "culture": { "score": 70, "matched": [...], "missing": [...], "bonus": [...], "reasoning": "..." }
+  }
+}
+```
+
+---
+
 ## Project Structure
 
 ```
@@ -540,6 +708,12 @@ backend/
 │   │   ├── ai_summary.rs          # Developer profile generation
 │   │   ├── embeddings.rs          # Code chunking utilities
 │   │   └── semantic_search.rs     # Code categorization by keywords
+│   ├── matching/
+│   │   ├── mod.rs                 # Matching module exports, TalentFitScore, ScoreWeights
+│   │   ├── skills.rs              # Skill matching with synonyms and fuzzy matching
+│   │   ├── experience.rs          # Experience scoring with duration parsing
+│   │   ├── team_fit.rs            # Team fit calculation (skill gaps, work/code style)
+│   │   └── culture.rs             # AI-powered culture fit analysis
 │   └── endpoints/
 │       ├── mod.rs                 # Endpoint exports
 │       ├── ep_add_to_db.rs        # Add candidate endpoint

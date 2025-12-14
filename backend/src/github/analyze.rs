@@ -144,8 +144,8 @@ pub async fn analyze_github_user(
 }
 
 /// Deep analysis - collects code samples without embeddings
+/// Returns full GitHubStats with code_excerpts and analysis_metadata
 pub async fn analyze_github_user_deep(
-    _conn: &mut PgConnection,
     username: &str,
     token: &str,
 ) -> Result<GitHubStats, Box<dyn std::error::Error + Send + Sync>> {

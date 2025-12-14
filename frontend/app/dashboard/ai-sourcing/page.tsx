@@ -26,6 +26,7 @@ import {
 import { useJobs } from "../../hooks/useJobs";
 import { useTeams } from "../../hooks/useTeams";
 import type { Job, Team, TeamMember, Candidate, Skill } from "../../types";
+import { getSkillName } from "../../types";
 
 type SourceType = "linkedin" | "github" | "portfolio";
 
@@ -97,9 +98,9 @@ function generateSourcedCandidate(
   const randomTitle = titles[Math.floor(Math.random() * titles.length)];
 
   // Generate skills based on job requirements with source-specific extras
-  const baseSkills = job.requiredSkills.slice(0, 4);
+  const baseSkills = job.requiredSkills.slice(0, 4).map(getSkillName);
   const extraSkills = extraSkillsBySource[source];
-  const candidateSkillNames = [
+  const candidateSkillNames: string[] = [
     ...baseSkills.slice(0, Math.floor(Math.random() * baseSkills.length + 2)),
     ...extraSkills.slice(0, Math.floor(Math.random() * 3) + 1),
   ];
@@ -111,7 +112,8 @@ function generateSourcedCandidate(
   }));
 
   // Calculate job match score
-  const matchingSkills = job.requiredSkills.filter((s) =>
+  const jobSkillNames = job.requiredSkills.map(getSkillName);
+  const matchingSkills = jobSkillNames.filter((s) =>
     candidateSkillNames.includes(s)
   );
   const jobScore = Math.min(
@@ -337,14 +339,17 @@ export default function AISourcingPage() {
                   Required Skills
                 </p>
                 <div className="flex flex-wrap gap-1.5">
-                  {selectedJob.requiredSkills.map((skill) => (
-                    <span
-                      key={skill}
-                      className="rounded-full bg-indigo-100 px-2.5 py-0.5 text-xs font-medium text-indigo-700"
-                    >
-                      {skill}
-                    </span>
-                  ))}
+                  {selectedJob.requiredSkills.map((skill, index) => {
+                    const skillName = getSkillName(skill);
+                    return (
+                      <span
+                        key={`${skillName}-${index}`}
+                        className="rounded-full bg-indigo-100 px-2.5 py-0.5 text-xs font-medium text-indigo-700"
+                      >
+                        {skillName}
+                      </span>
+                    );
+                  })}
                 </div>
               </div>
             )}

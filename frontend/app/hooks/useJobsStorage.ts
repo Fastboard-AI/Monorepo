@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import type { Job, JobStatus, ExperienceLevel } from "../types";
+import type { Job, JobStatus, ExperienceLevel, JobSkill } from "../types";
 
 const STORAGE_KEY = "fastboard_jobs";
 
@@ -10,7 +10,7 @@ interface StoredJob {
   title: string;
   description?: string;
   location?: string;
-  requiredSkills: string[];
+  requiredSkills: JobSkill[];
   experienceLevel: string;
   status: string;
   candidateIds: string[];

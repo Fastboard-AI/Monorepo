@@ -10,6 +10,7 @@ import {
   Eye,
 } from "lucide-react";
 import type { Job } from "../types";
+import { getSkillName } from "../types";
 
 interface JobCardProps {
   job: Job;
@@ -103,14 +104,17 @@ export function JobCard({
       {/* Skills */}
       {job.requiredSkills.length > 0 && (
         <div className="mt-3 flex flex-wrap gap-1.5">
-          {job.requiredSkills.slice(0, 4).map((skill) => (
-            <span
-              key={skill}
-              className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-600"
-            >
-              {skill}
-            </span>
-          ))}
+          {job.requiredSkills.slice(0, 4).map((skill, index) => {
+            const skillName = getSkillName(skill);
+            return (
+              <span
+                key={`${skillName}-${index}`}
+                className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-600"
+              >
+                {skillName}
+              </span>
+            );
+          })}
           {job.requiredSkills.length > 4 && (
             <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-500">
               +{job.requiredSkills.length - 4} more

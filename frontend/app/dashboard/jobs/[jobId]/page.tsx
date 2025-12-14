@@ -26,7 +26,8 @@ import { JobTeamPanel } from "../../../components/JobTeamPanel";
 import { useJobs } from "../../../hooks/useJobs";
 import { useTeams } from "../../../hooks/useTeams";
 import { api, JobCandidateResponse } from "../../../lib/api";
-import type { Candidate, Job, Team, ExperienceLevel, JobStatus } from "../../../types";
+import type { Candidate, Job, Team, ExperienceLevel, JobStatus, JobSkill } from "../../../types";
+import { getSkillName } from "../../../types";
 
 const statusConfig: Record<Job["status"], { label: string; className: string }> = {
   sourcing: {
@@ -122,6 +123,12 @@ export default function JobDetailPage() {
           },
           resumeFileName: jc.candidate.resume_file_name || undefined,
           uploadedAt: new Date(jc.candidate.created_at),
+          // GitHub enrichment fields
+          aiDetectionScore: jc.candidate.ai_detection_score ?? undefined,
+          aiProficiencyScore: jc.candidate.ai_proficiency_score ?? undefined,
+          codeAuthenticityScore: jc.candidate.code_authenticity_score ?? undefined,
+          developerProfile: jc.candidate.developer_profile ?? undefined,
+          analysisStatus: (jc.candidate.analysis_status as "pending" | "analyzing" | "complete" | "failed") || "complete",
         }));
         setJobCandidates(candidates);
       } catch (error) {
@@ -181,7 +188,7 @@ export default function JobDetailPage() {
         title?: string;
         description?: string;
         location?: string;
-        requiredSkills?: string[];
+        requiredSkills?: JobSkill[];
         experienceLevel?: ExperienceLevel;
         status?: JobStatus;
       }
@@ -321,14 +328,17 @@ export default function JobDetailPage() {
                 )}
                 {job.requiredSkills.length > 0 && (
                   <div className="mt-3 flex flex-wrap gap-2">
-                    {job.requiredSkills.map((skill) => (
-                      <span
-                        key={skill}
-                        className="rounded-full bg-indigo-50 px-3 py-1 text-sm font-medium text-indigo-700"
-                      >
-                        {skill}
-                      </span>
-                    ))}
+                    {job.requiredSkills.map((skill, index) => {
+                      const skillName = getSkillName(skill);
+                      return (
+                        <span
+                          key={`${skillName}-${index}`}
+                          className="rounded-full bg-indigo-50 px-3 py-1 text-sm font-medium text-indigo-700"
+                        >
+                          {skillName}
+                        </span>
+                      );
+                    })}
                   </div>
                 )}
               </div>

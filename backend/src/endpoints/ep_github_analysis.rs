@@ -1,8 +1,6 @@
 use rocket::{get, post};
 use rocket::response::content::RawJson;
-use rocket_db_pools::Connection;
 
-use crate::db::MainDatabase;
 use crate::github::analyze::{analyze_github_user, analyze_github_user_deep};
 use crate::github::ai_summary::generate_developer_profile;
 
@@ -27,10 +25,9 @@ pub async fn analyze_github(username: &str) -> RawJson<String> {
     }
 }
 
-/// Deep analyze a GitHub user using embeddings (requires DB)
+/// Deep analyze a GitHub user with code excerpts
 #[post("/github/analyze/<username>/deep")]
 pub async fn analyze_github_deep(
-    mut db: Connection<MainDatabase>,
     username: &str,
 ) -> RawJson<String> {
     let token = std::env::var("GITHUB_TOKEN").unwrap_or_default();
@@ -39,7 +36,7 @@ pub async fn analyze_github_deep(
         return RawJson(r#"{"error": "GitHub token not configured"}"#.to_string());
     }
 
-    match analyze_github_user_deep(&mut *db, username, &token).await {
+    match analyze_github_user_deep(username, &token).await {
         Ok(stats) => {
             RawJson(serde_json::to_string(&stats).unwrap_or_else(|_| {
                 r#"{"error": "Failed to serialize response"}"#.to_string()
@@ -85,7 +82,6 @@ pub async fn get_github_profile(username: &str) -> RawJson<String> {
 /// Get deep AI-generated developer profile with code excerpts
 #[get("/github/profile/<username>/deep")]
 pub async fn get_github_profile_deep(
-    mut db: Connection<MainDatabase>,
     username: &str,
 ) -> RawJson<String> {
     let token = std::env::var("GITHUB_TOKEN").unwrap_or_default();
@@ -95,7 +91,7 @@ pub async fn get_github_profile_deep(
     }
 
     // Get deep stats with code excerpts
-    let stats = match analyze_github_user_deep(&mut *db, username, &token).await {
+    let stats = match analyze_github_user_deep(username, &token).await {
         Ok(s) => s,
         Err(e) => {
             return RawJson(format!(r#"{{"error": "Deep analysis failed: {}"}}"#, e));

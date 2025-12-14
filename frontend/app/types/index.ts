@@ -32,6 +32,8 @@ export interface ScoreBreakdown {
   teamFit: number;
 }
 
+export type AnalysisStatus = 'pending' | 'analyzing' | 'complete' | 'failed';
+
 export interface Candidate {
   id: string;
   name: string;
@@ -49,6 +51,15 @@ export interface Candidate {
   avatarUrl?: string;
   resumeFileName?: string;
   uploadedAt: Date;
+  // GitHub enrichment fields (populated async)
+  codeCharacteristics?: CodeCharacteristics;
+  aiDetectionScore?: number;
+  aiProficiencyScore?: number;
+  codeAuthenticityScore?: number;
+  aiAnalysisDetails?: AIAnalysisDetails;
+  developerProfile?: string;
+  analysisMetadata?: AnalysisMetadata;
+  analysisStatus?: AnalysisStatus;
 }
 
 export type JobStatus = "sourcing" | "reviewing" | "filled" | "closed";
@@ -124,18 +135,33 @@ export interface Team {
   updatedAt: Date;
 }
 
+// Enhanced skill format with level and mandatory flag
+export interface RequiredSkill {
+  name: string;
+  level?: string; // "beginner" | "intermediate" | "advanced" | "expert"
+  mandatory?: boolean;
+}
+
+// Skills can be either legacy string[] or enhanced RequiredSkill[]
+export type JobSkill = string | RequiredSkill;
+
 export interface Job {
   id: string;
   title: string;
   description?: string;
   location?: string;
-  requiredSkills: string[];
+  requiredSkills: JobSkill[];
   experienceLevel: ExperienceLevel;
   status: JobStatus;
   candidateIds: string[];
   teamId?: string;
   createdAt: Date;
   updatedAt: Date;
+}
+
+// Helper to get skill name from either format
+export function getSkillName(skill: JobSkill): string {
+  return typeof skill === "string" ? skill : skill.name;
 }
 
 export type SortOption = "score" | "name" | "experience" | "uploadDate";
