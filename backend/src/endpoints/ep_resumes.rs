@@ -44,49 +44,37 @@ pub struct EducationExtracted {
     pub field: Option<String>,
 }
 
-const RESUME_EXTRACTION_PROMPT: &str = r#"Extract structured information from this resume text.
+const RESUME_EXTRACTION_PROMPT: &str = r#"You are parsing a resume. Extract ALL information including URLs that may be broken across lines or spaces.
 
-Return a JSON object with these fields:
+CRITICAL - URL EXTRACTION:
+- URLs may be split across lines or have spaces/breaks in them - piece them together
+- Look for patterns like "github.com/username" even without https://
+- Look for "linkedin.com/in/username" patterns
+- Reconstruct full URLs: https://github.com/username, https://linkedin.com/in/username
+- Personal websites are any other URLs that aren't GitHub or LinkedIn
+
+CRITICAL - NAME EXTRACTION:
+- Extract the COMPLETE full name (first + last name)
+- The name is usually at the top of the resume in large text
+
+Return ONLY this JSON (no other text):
 {
-  "name": "Full Name",
-  "email": "email@example.com or null",
-  "phone": "phone number or null",
-  "location": "City, Country or null",
-  "title": "Current/Most Recent Job Title or null",
-  "summary": "Brief professional summary (1-2 sentences) or null",
-  "skills": [
-    {"name": "Skill Name", "level": "beginner|intermediate|advanced|expert"}
-  ],
-  "experience": [
-    {
-      "title": "Job Title",
-      "company": "Company Name",
-      "duration": "Start - End or duration",
-      "description": "Brief description or null"
-    }
-  ],
-  "education": [
-    {
-      "degree": "Degree Name",
-      "institution": "School/University",
-      "year": "Graduation year or date range",
-      "field": "Field of study or null"
-    }
-  ],
+  "name": "Full Name Here",
+  "email": "email or null",
+  "phone": "phone or null",
+  "location": "location or null",
+  "title": "job title or null",
+  "summary": "1-2 sentence summary or null",
+  "skills": [{"name": "Skill", "level": "beginner|intermediate|advanced|expert"}],
+  "experience": [{"title": "Title", "company": "Company", "duration": "Duration", "description": "Description or null"}],
+  "education": [{"degree": "Degree", "institution": "School", "year": "Year", "field": "Field or null"}],
   "github_url": "https://github.com/username or null",
   "linkedin_url": "https://linkedin.com/in/username or null",
-  "website_url": "Personal website/portfolio URL or null",
-  "other_links": ["any other relevant URLs"]
+  "website_url": "https://personalsite.com or null",
+  "other_links": []
 }
 
-Guidelines:
-- For skills, estimate level based on context (years mentioned, project complexity, etc.)
-- Extract ALL URLs found - categorize GitHub, LinkedIn, and personal websites separately
-- Personal websites include: portfolio sites, personal blogs, custom domains
-- If no name is found, use "Unknown"
-- Return ONLY valid JSON, no additional text
-
-Resume text:
+Resume:
 "#;
 
 /// Extract text from a PDF file
@@ -101,6 +89,25 @@ fn extract_docx_text(data: &[u8]) -> Result<String, String> {
     let mut archive = zip::ZipArchive::new(cursor)
         .map_err(|e| format!("Failed to open DOCX: {}", e))?;
 
+    // Extract hyperlinks from relationships file first
+    let mut hyperlinks: Vec<String> = Vec::new();
+    if let Ok(mut rels_file) = archive.by_name("word/_rels/document.xml.rels") {
+        let mut rels_content = String::new();
+        let _ = rels_file.read_to_string(&mut rels_content);
+        for part in rels_content.split("Target=\"") {
+            if let Some(url) = part.split('"').next() {
+                if url.starts_with("http") {
+                    hyperlinks.push(url.to_string());
+                }
+            }
+        }
+    }
+
+    // Re-open archive
+    let cursor = Cursor::new(data);
+    let mut archive = zip::ZipArchive::new(cursor)
+        .map_err(|e| format!("Failed to open DOCX: {}", e))?;
+
     let mut document_xml = archive.by_name("word/document.xml")
         .map_err(|e| format!("Failed to find document.xml: {}", e))?;
 
@@ -108,7 +115,7 @@ fn extract_docx_text(data: &[u8]) -> Result<String, String> {
     document_xml.read_to_string(&mut xml_content)
         .map_err(|e| format!("Failed to read document.xml: {}", e))?;
 
-    // Simple XML text extraction - remove tags and get text content
+    // Extract text from XML
     let mut text = String::new();
     let mut in_tag = false;
     let mut last_was_space = false;
@@ -122,9 +129,7 @@ fn extract_docx_text(data: &[u8]) -> Result<String, String> {
                     last_was_space = true;
                 }
             }
-            '>' => {
-                in_tag = false;
-            }
+            '>' => in_tag = false,
             _ if !in_tag => {
                 if ch.is_whitespace() {
                     if !last_was_space && !text.is_empty() {
@@ -141,12 +146,21 @@ fn extract_docx_text(data: &[u8]) -> Result<String, String> {
     }
 
     // Decode XML entities
-    let text = text
+    let mut text = text
         .replace("&amp;", "&")
         .replace("&lt;", "<")
         .replace("&gt;", ">")
         .replace("&quot;", "\"")
         .replace("&apos;", "'");
+
+    // Append hyperlinks so LLM can see them (DOCX stores links separately)
+    if !hyperlinks.is_empty() {
+        text.push_str("\n\nLinks found in document:\n");
+        for link in hyperlinks {
+            text.push_str(&link);
+            text.push('\n');
+        }
+    }
 
     Ok(text.trim().to_string())
 }
@@ -229,7 +243,7 @@ pub async fn parse_resume(content_type: &ContentType, data: Data<'_>) -> RawJson
         return RawJson(r#"{"error": "Could not extract text from file"}"#.to_string());
     }
 
-    // Parse with Gemini
+    // Parse with Gemini - let the LLM find everything including URLs
     match parse_with_gemini(&text).await {
         Ok(parsed) => RawJson(serde_json::to_string(&parsed).unwrap()),
         Err(e) => RawJson(format!(r#"{{"error": "{}"}}"#, e)),
