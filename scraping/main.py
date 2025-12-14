@@ -1,46 +1,14 @@
 import json
 import logging
-import time
+import re
 import urllib.parse
+import os
+import tls_client
 from dataclasses import dataclass, field, asdict
 from typing import List, Optional, Dict, Literal, Any
-from playwright.sync_api import sync_playwright
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger("LinkedInScraper")
-
-class AuthenticationError(Exception):
-    """Raised when LinkedIn returns 401 Unauthorized."""
-    pass
-
-def url_to_public_id(url: str) -> str:
-    """
-    Extracts the public identifier (username) from a LinkedIn URL.
-    Example: https://www.linkedin.com/in/satyanadella/ -> satyanadella
-    """
-    if not url:
-        return ""
-    
-    if "linkedin.com" not in url:
-        return url
-
-    path = urllib.parse.urlparse(url).path
-    parts = [p for p in path.split('/') if p]
-    
-    if 'in' in parts:
-        try:
-            index = parts.index('in')
-            return parts[index + 1]
-        except IndexError:
-            pass
-            
-    return path.strip("/")
-
-
-ConnectionDistance = Literal["DISTANCE_1", "DISTANCE_2", "DISTANCE_3", "OUT_OF_NETWORK", None]
-DISTANCE_TO_DEGREE = {
-    "DISTANCE_1": 1, "DISTANCE_2": 2, "DISTANCE_3": 3, "OUT_OF_NETWORK": None,
-}
 
 @dataclass
 class Date:
@@ -85,22 +53,15 @@ class LinkedInProfile:
     industry: Optional[Dict[str, Any]] = None
     positions: List[Position] = field(default_factory=list)
     educations: List[Education] = field(default_factory=list)
-    connection_distance: Optional[ConnectionDistance] = None
-    connection_degree: Optional[int] = None
 
 def _resolve_references(data: dict) -> Dict[str, dict]:
-    return {
-        entity.get("entityUrn"): entity
-        for entity in data.get("included", [])
-        if entity.get("entityUrn")
-    }
+    return {e.get("entityUrn"): e for e in data.get("included", []) if e.get("entityUrn")}
 
 def _resolve_star_field(entity: dict, urn_map: Dict[str, dict], field_name: str) -> Any:
-    value = entity.get(field_name)
-    if not value: return None
-    if isinstance(value, list):
-        return [urn_map.get(urn) for urn in value if urn_map.get(urn)]
-    return urn_map.get(value)
+    val = entity.get(field_name)
+    if not val: return None
+    if isinstance(val, list): return [urn_map.get(u) for u in val if urn_map.get(u)]
+    return urn_map.get(val)
 
 def _date_from_raw(raw: Optional[dict]) -> Optional[Date]:
     if not raw: return None
@@ -132,23 +93,21 @@ def _enrich_education(edu: dict, urn_map: Dict[str, dict]) -> Education:
         urn=edu.get("entityUrn"),
     )
 
-def _extract_connection_info(profile_entity: dict, urn_map: Dict[str, dict]):
-    member_rel_urn = profile_entity.get("*memberRelationship")
-    if not member_rel_urn: return None, None
-    rel = urn_map.get(member_rel_urn)
-    if not rel: return None, None
-    union = rel.get("memberRelationshipUnion") or rel.get("memberRelationshipData")
-    if not union: return None, None
-    if "connectedMember" in union or "connected" in union: return "DISTANCE_1", 1
-    if "noConnection" in union:
-        dist = union["noConnection"].get("memberDistance")
-        return dist, DISTANCE_TO_DEGREE.get(dist)
-    return None, None
+def url_to_public_id(url: str) -> str:
+    if not url: return ""
+    if "linkedin.com" not in url: return url
+    path = urllib.parse.urlparse(url).path
+    parts = [p for p in path.split('/') if p]
+    if 'in' in parts:
+        try:
+            return parts[parts.index('in') + 1]
+        except IndexError: pass
+    return path.strip("/")
 
 def parse_linkedin_voyager_response(json_response: dict, public_identifier: Optional[str] = None) -> dict:
     urn_map = _resolve_references(json_response)
-    
     profile_entity = None
+    
     for entity in json_response.get("included", []):
         if entity.get("$type") == "com.linkedin.voyager.dash.identity.profile.Profile":
             if public_identifier is None or entity.get("publicIdentifier") == public_identifier:
@@ -164,34 +123,21 @@ def parse_linkedin_voyager_response(json_response: dict, public_identifier: Opti
 
     first_name = profile_entity.get("firstName", "")
     last_name = profile_entity.get("lastName", "")
-    conn_dist, conn_degree = _extract_connection_info(profile_entity, urn_map)
-
+    
     positions = []
-    pos_groups_urn = profile_entity.get("*profilePositionGroups")
-    if pos_groups_urn:
-        group_resp = urn_map.get(pos_groups_urn)
-        if group_resp:
-            for group_urn in group_resp.get("*elements", []):
-                group = urn_map.get(group_urn)
-                if not group: continue
-                positions_urn = group.get("*profilePositionInPositionGroup")
-                if positions_urn:
-                    pos_coll = urn_map.get(positions_urn)
-                    if pos_coll:
-                        for pos_urn in pos_coll.get("*elements", []):
-                            pos = urn_map.get(pos_urn)
-                            if pos: positions.append(_enrich_position(pos, urn_map))
+    if (pos_groups_urn := profile_entity.get("*profilePositionGroups")) and (group_resp := urn_map.get(pos_groups_urn)):
+        for group_urn in group_resp.get("*elements", []):
+            if (group := urn_map.get(group_urn)) and (pos_urns := group.get("*profilePositionInPositionGroup")):
+                 if (pos_coll := urn_map.get(pos_urns)):
+                    for pu in pos_coll.get("*elements", []):
+                        if (p := urn_map.get(pu)): positions.append(_enrich_position(p, urn_map))
 
     educations = []
-    edu_urn = profile_entity.get("*profileEducations")
-    if edu_urn:
-        edu_coll = urn_map.get(edu_urn)
-        if edu_coll:
-            for e_urn in edu_coll.get("*elements", []):
-                edu = urn_map.get(e_urn)
-                if edu: educations.append(_enrich_education(edu, urn_map))
+    if (edu_urn := profile_entity.get("*profileEducations")) and (edu_coll := urn_map.get(edu_urn)):
+        for eu in edu_coll.get("*elements", []):
+            if (e := urn_map.get(eu)): educations.append(_enrich_education(e, urn_map))
 
-    profile_obj = LinkedInProfile(
+    return asdict(LinkedInProfile(
         urn=profile_entity["entityUrn"],
         first_name=first_name,
         last_name=last_name,
@@ -204,137 +150,169 @@ def parse_linkedin_voyager_response(json_response: dict, public_identifier: Opti
         industry=_resolve_star_field(profile_entity, urn_map, "*industry"),
         url=f"https://www.linkedin.com/in/{profile_entity.get('publicIdentifier', '')}/",
         positions=positions,
-        educations=educations,
-        connection_distance=conn_dist,
-        connection_degree=conn_degree
-    )
-    return asdict(profile_obj)
+        educations=educations
+    ))
+
+def parse_search_results(json_response: dict) -> List[Dict[str, str]]:
+    results = []
+    for entity in json_response.get("included", []):
+        if "navigationUrl" in entity and "title" in entity:
+            nav_url = entity["navigationUrl"]
+            if "/in/" not in nav_url: continue
+            
+            clean_url = nav_url.split('?')[0]
+            results.append({
+                "full_name": entity.get("title", {}).get("text", "Unknown"),
+                "headline": entity.get("primarySubtitle", {}).get("text", ""),
+                "public_identifier": url_to_public_id(clean_url),
+                "url": clean_url
+            })
+    return results
 
 
-class SimpleSession:
-    """A minimal replacement for AccountSession to hold browser objects."""
-    def __init__(self, page, context):
-        self.page = page
-        self.context = context
-
-class PlaywrightLinkedinAPI:
-    def __init__(self, session: SimpleSession):
-        self.session = session
-        self.page = session.page
-        self.context = session.context
-
-        # Extract JSESSIONID for CSRF
-        cookies = self.context.cookies()
-        cookies_dict = {c['name']: c['value'] for c in cookies}
-        self.jsessionid = cookies_dict.get('JSESSIONID', '').strip('"')
-
-        # Fingerprinting
-        self.headers = self._build_headers()
-
-    def _build_headers(self):
-        # We run JS in the browser to get the exact headers matching this session
-        user_agent = self.page.evaluate("navigator.userAgent")
-        accept_language = self.page.evaluate("navigator.languages ? navigator.languages.join(',') : navigator.language")
+class LinkedInAPI:
+    def __init__(self, cookies_path="cookies.json"):
+        self.session = tls_client.Session(
+            client_identifier="chrome_120",
+            random_tls_extension_order=True
+        )
         
-        # Simple client hints extraction
-        sec_ch_ua = self.page.evaluate("""() => {
-            if (navigator.userAgentData) {
-                return navigator.userAgentData.brands.map(b => `"${b.brand}";v="${b.version}"`).join(', ');
-            } return '';
-        }""")
+        self._load_cookies(cookies_path)
         
-        return {
-            'accept': 'application/vnd.linkedin.normalized+json+2.1',
-            'accept-language': accept_language,
-            'csrf-token': self.jsessionid,
-            'referer': self.page.url,
-            'sec-ch-ua': sec_ch_ua,
-            'user-agent': user_agent,
-            'x-li-lang': 'en_US',
-            'x-restli-protocol-version': '2.0.0',
+        jsessionid = self.session.cookies.get("JSESSIONID", "")
+        self.session.headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            "Accept-Language": "en-US,en;q=0.9",
+            "Accept": "application/vnd.linkedin.normalized+json+2.1",
+            "X-Li-Lang": "en_US",
+            "X-Restli-Protocol-Version": "2.0.0",
+            "Csrf-Token": jsessionid.strip('"') if jsessionid else "",
+            "Origin": "https://www.linkedin.com",
+            "Referer": "https://www.linkedin.com/"
         }
 
-    def get_profile(self, public_identifier: Optional[str] = None, profile_url: Optional[str] = None):
-        if not public_identifier and profile_url:
-            public_identifier = url_to_public_id(profile_url)
+    def _load_cookies(self, path):
+        if not os.path.exists(path):
+            raise FileNotFoundError(f"Cookies file {path} not found.")
+        
+        with open(path, 'r') as f:
+            cookies = json.load(f)
+            
+        cookie_dict = {}
+        for c in cookies:
+            if "name" in c and "value" in c:
+                cookie_dict[c["name"]] = c["value"]
+        
+        self.session.cookies.update(cookie_dict)
 
-        if not public_identifier:
-            raise ValueError("Need public_identifier or profile_url")
-
+    def get_profile(self, profile_url: str):
+        pid = url_to_public_id(profile_url)
         url = "https://www.linkedin.com/voyager/api/identity/dash/profiles"
         params = {
             'decorationId': 'com.linkedin.voyager.dash.deco.identity.profile.FullProfileWithEntities-91',
-            'memberIdentity': public_identifier,
+            'memberIdentity': pid,
             'q': 'memberIdentity',
         }
-
-        res = self.context.request.get(url, params=params, headers=self.headers)
-
-        if res.status == 401:
-            raise AuthenticationError("LinkedIn 401: Session Invalid.")
-        if res.status == 403:
-            logger.warning(f"Profile {public_identifier} is private or inaccessible.")
-            return None, None
         
-        if not res.ok:
-            raise Exception(f"API Error {res.status}: {res.text()}")
-
-        data = res.json()
+        res = self.session.get(url, params=params)
         
-        # Parse result using our local parser function
-        parsed = parse_linkedin_voyager_response(data, public_identifier=public_identifier)
-        return parsed, data
+        if res.status_code == 999:
+            raise Exception("Blocked (999). Try refreshing cookies or checking if account is restricted.")
+        if res.status_code != 200:
+            raise Exception(f"API Error {res.status_code}: {res.text}")
+            
+        return parse_linkedin_voyager_response(res.json(), public_identifier=pid)
+
+    def get_school_urn(self, school_url: str) -> Optional[str]:
+        print(f"Fetching school page: {school_url}")
+        
+        original_accept = self.session.headers.get("Accept")
+        self.session.headers["Accept"] = "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
+        
+        try:
+            res = self.session.get(school_url)
+            if res.status_code == 999:
+                print("   ERROR: LinkedIn blocked the HTML request (Status 999).")
+                return None
+                
+            match = re.search(r'(urn:li:fsd_school:\d+)', res.text)
+            return match.group(1) if match else None
+        finally:
+            if original_accept:
+                self.session.headers["Accept"] = original_accept
+
+    def get_school_alumni(self, school_urn: str, keyword: str = "", count: int = 10):
+        # this isnt working atm
+        url = "https://www.linkedin.com/voyager/api/search/dash/clusters"
+        keyword_part = f"keywords:{keyword}," if keyword else ""
+        query = (
+            f"({keyword_part}"
+            "flagshipSearchIntent:SEARCH_SRP,"
+            "queryParameters:("
+            "resultType:List(PEOPLE),"
+            f"schoolFilter:List({school_urn})"
+            "))"
+        )
+        params = {
+            'decorationId': 'com.linkedin.voyager.dash.deco.search.SearchClusterCollection-174',
+            'origin': 'FACETED_SEARCH',
+            'q': 'all',
+            'query': query,
+            'start': 0,
+            'count': count
+        }
+        
+        res = self.session.get(url, params=params)
+        
+        if res.status_code != 200:
+            print(f"Search failed: {res.status_code}")
+            return []
+            
+        return parse_search_results(res.json())
 
 def run():
-    print("--- LinkedIn Voyager API Scraper (Single File) ---")
+    print("LinkedIn Scraper")
     
-    with sync_playwright() as p:
-        # 1. Launch Browser
-        browser = p.chromium.launch(headless=False)
-        context = browser.new_context()
-        page = context.new_page()
+    try:
+        api = LinkedInAPI()
+        print("Cookies loaded")
+    except Exception as e:
+        print(f"Init Error: {e}")
+        return
 
-        # 2. Manual Login
-        print("Navigating to login page...")
-        page.goto("https://www.linkedin.com/login")
+    while True:
+        target = input("\nEnter Profile URL, School URL, or 'q': ").strip()
+        if target.lower() == 'q': break
         
-        print("\n" + "!"*50)
-        print("ACTION REQUIRED: Log in to LinkedIn manually now.")
-        print("When you are on the Feed page, press ENTER in this terminal.")
-        print("!"*50 + "\n")
-        input(">>> Press ENTER after login...")
-
-        session = SimpleSession(page, context)
-        api = PlaywrightLinkedinAPI(session)
-
-        while True:
-            target = input("\nEnter profile URL (or 'q' to quit): ").strip()
-            if target.lower() == 'q':
-                break
-            
-            try:
-                print(f"Fetching data for {target}...")
-                profile, raw = api.get_profile(profile_url=target)
-                
-                if profile:
-                    print(f"\nName: {profile['full_name']}")
-                    print(f"   Headline: {profile['headline']}")
-                    print(f"   Location: {profile['location_name']}")
-                    if profile['positions']:
-                        print(f"   Latest Job: {profile['positions'][0]['title']} at {profile['positions'][0]['company_name']}")
-                    
-                    # Save to file
-                    fname = f"profile_{profile['public_identifier']}.json"
-                    with open(fname, "w", encoding="utf-8") as f:
-                        json.dump(profile, f, indent=2, default=str)
-                    print(f"   Saved to {fname}")
+        try:
+            if "linkedin.com/school/" in target:
+                urn = api.get_school_urn(target)
+                if urn:
+                    kw = input("   Filter keyword: ").strip()
+                    alumni = api.get_school_alumni(urn, keyword=kw, count=10)
+                    print(f"\n   Found {len(alumni)} alumni.")
+                    for p in alumni:
+                        print(f"   - {p['full_name']} ({p['public_identifier']})")
+                        
+                    if alumni:
+                        fname = f"alumni_{urn.split(':')[-1]}.json"
+                        with open(fname, "w", encoding='utf-8') as f:
+                            json.dump(alumni, f, indent=2)
+                        print(f"   Saved to {fname}")
                 else:
-                    print("Could not fetch profile (Private/Blocked).")
-                    
-            except Exception as e:
-                print(f"Error: {e}")
+                    print("Could not find School URN.")
 
-        browser.close()
+            elif "linkedin.com/in/" in target or "/" not in target:
+                profile = api.get_profile(target)
+                print(f"   Fetched: {profile['full_name']} - {profile['headline']}")
+                
+                fname = f"profile_{profile['public_identifier']}.json"
+                with open(fname, "w", encoding='utf-8') as f:
+                    json.dump(profile, f, indent=2, default=str)
+                print(f"   Saved to {fname}")
+                
+        except Exception as e:
+            print(f"Error: {e}")
 
 if __name__ == "__main__":
     run()
