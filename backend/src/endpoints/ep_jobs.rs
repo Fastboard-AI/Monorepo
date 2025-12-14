@@ -42,7 +42,7 @@ struct JobRow {
     updated_at: String,
 }
 
-#[get("/api/jobs")]
+#[get("/jobs")]
 pub async fn get_jobs(mut db: Connection<MainDatabase>) -> RawJson<String> {
     let rows = sqlx::query(
         r#"SELECT id, title, description, location, required_skills, experience_level, status, team_id, created_at, updated_at FROM jobs ORDER BY created_at DESC"#
@@ -76,7 +76,7 @@ pub async fn get_jobs(mut db: Connection<MainDatabase>) -> RawJson<String> {
     RawJson(serde_json::to_string(&jobs).unwrap())
 }
 
-#[get("/api/jobs/<id>")]
+#[get("/jobs/<id>")]
 pub async fn get_job(id: &str, mut db: Connection<MainDatabase>) -> RawJson<String> {
     let uuid = uuid::Uuid::parse_str(id).unwrap();
 
@@ -108,7 +108,7 @@ pub async fn get_job(id: &str, mut db: Connection<MainDatabase>) -> RawJson<Stri
     RawJson(serde_json::to_string(&job).unwrap())
 }
 
-#[post("/api/jobs", data = "<data>")]
+#[post("/jobs", data = "<data>")]
 pub async fn create_job<'a>(data: json::Json<CreateJob<'a>>, mut db: Connection<MainDatabase>) -> RawJson<String> {
     let id = uuid::Uuid::new_v4();
 
@@ -142,7 +142,7 @@ pub async fn create_job<'a>(data: json::Json<CreateJob<'a>>, mut db: Connection<
     RawJson(serde_json::to_string(&job).unwrap())
 }
 
-#[put("/api/jobs/<id>", data = "<data>")]
+#[put("/jobs/<id>", data = "<data>")]
 pub async fn update_job<'a>(id: &str, data: json::Json<UpdateJob<'a>>, mut db: Connection<MainDatabase>) -> RawJson<String> {
     let uuid = uuid::Uuid::parse_str(id).unwrap();
 
@@ -194,7 +194,7 @@ pub async fn update_job<'a>(id: &str, data: json::Json<UpdateJob<'a>>, mut db: C
     RawJson(format!(r#"{{"success":true,"id":"{}"}}"#, id))
 }
 
-#[delete("/api/jobs/<id>")]
+#[delete("/jobs/<id>")]
 pub async fn delete_job(id: &str, mut db: Connection<MainDatabase>) -> RawJson<String> {
     let uuid = uuid::Uuid::parse_str(id).unwrap();
 

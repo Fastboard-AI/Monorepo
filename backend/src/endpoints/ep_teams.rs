@@ -66,7 +66,7 @@ struct TeamRow {
     updated_at: String,
 }
 
-#[get("/api/teams")]
+#[get("/teams")]
 pub async fn get_teams(mut db: Connection<MainDatabase>) -> RawJson<String> {
     let rows = sqlx::query(
         r#"SELECT id, name, target_role, compatibility_score, created_at, updated_at FROM teams ORDER BY created_at DESC"#
@@ -122,7 +122,7 @@ pub async fn get_teams(mut db: Connection<MainDatabase>) -> RawJson<String> {
     RawJson(serde_json::to_string(&teams).unwrap())
 }
 
-#[get("/api/teams/<id>")]
+#[get("/teams/<id>")]
 pub async fn get_team(id: &str, mut db: Connection<MainDatabase>) -> RawJson<String> {
     let uuid = uuid::Uuid::parse_str(id).unwrap();
 
@@ -175,7 +175,7 @@ pub async fn get_team(id: &str, mut db: Connection<MainDatabase>) -> RawJson<Str
     RawJson(serde_json::to_string(&team).unwrap())
 }
 
-#[post("/api/teams", data = "<data>")]
+#[post("/teams", data = "<data>")]
 pub async fn create_team<'a>(data: json::Json<CreateTeam<'a>>, mut db: Connection<MainDatabase>) -> RawJson<String> {
     let id = uuid::Uuid::new_v4();
 
@@ -202,7 +202,7 @@ pub async fn create_team<'a>(data: json::Json<CreateTeam<'a>>, mut db: Connectio
     RawJson(serde_json::to_string(&team).unwrap())
 }
 
-#[put("/api/teams/<id>", data = "<data>")]
+#[put("/teams/<id>", data = "<data>")]
 pub async fn update_team<'a>(id: &str, data: json::Json<UpdateTeam<'a>>, mut db: Connection<MainDatabase>) -> RawJson<String> {
     let uuid = uuid::Uuid::parse_str(id).unwrap();
 
@@ -228,7 +228,7 @@ pub async fn update_team<'a>(id: &str, data: json::Json<UpdateTeam<'a>>, mut db:
     RawJson(format!(r#"{{"success":true,"id":"{}"}}"#, id))
 }
 
-#[delete("/api/teams/<id>")]
+#[delete("/teams/<id>")]
 pub async fn delete_team(id: &str, mut db: Connection<MainDatabase>) -> RawJson<String> {
     let uuid = uuid::Uuid::parse_str(id).unwrap();
 
@@ -241,7 +241,7 @@ pub async fn delete_team(id: &str, mut db: Connection<MainDatabase>) -> RawJson<
     RawJson(format!(r#"{{"success":true,"id":"{}"}}"#, id))
 }
 
-#[post("/api/teams/<team_id>/members", data = "<data>")]
+#[post("/teams/<team_id>/members", data = "<data>")]
 pub async fn add_team_member<'a>(team_id: &str, data: json::Json<CreateTeamMember<'a>>, mut db: Connection<MainDatabase>) -> RawJson<String> {
     let id = uuid::Uuid::new_v4();
     let team_uuid = uuid::Uuid::parse_str(team_id).unwrap();
@@ -273,7 +273,7 @@ pub async fn add_team_member<'a>(team_id: &str, data: json::Json<CreateTeamMembe
 }
 
 #[allow(unused_variables)]
-#[delete("/api/teams/<team_id>/members/<member_id>")]
+#[delete("/teams/<team_id>/members/<member_id>")]
 pub async fn remove_team_member(team_id: &str, member_id: &str, mut db: Connection<MainDatabase>) -> RawJson<String> {
     let member_uuid = uuid::Uuid::parse_str(member_id).unwrap();
 

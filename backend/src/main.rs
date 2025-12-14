@@ -18,7 +18,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let _server = rocket::build()
         .attach(MainDatabase::init())
         .attach(cors)
-        .mount("/", routes![
+        .mount("/api/", routes![
             endpoints::add_to_db,
             endpoints::analyse_repo,
             endpoints::analyse_github,

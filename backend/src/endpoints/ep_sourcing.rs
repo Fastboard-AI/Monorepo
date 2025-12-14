@@ -198,7 +198,7 @@ fn generate_mock_candidate(source: &str) -> SourcingResult {
     }
 }
 
-#[post("/api/sourcing/search", data = "<data>")]
+#[post("/sourcing/search", data = "<data>")]
 pub async fn search_candidates(data: json::Json<SourcingRequest>) -> RawJson<String> {
     let count = data.count.min(50).max(1);
     let sources = if data.sources.is_empty() {

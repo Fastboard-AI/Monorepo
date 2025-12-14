@@ -104,7 +104,7 @@ pub struct JobCandidateRow {
     added_at: String,
 }
 
-#[post("/api/candidates", data = "<data>")]
+#[post("/candidates", data = "<data>")]
 pub async fn create_candidate(data: json::Json<CreateCandidate>, mut db: Connection<MainDatabase>) -> RawJson<String> {
     let id = uuid::Uuid::new_v4();
 
@@ -152,7 +152,7 @@ pub async fn create_candidate(data: json::Json<CreateCandidate>, mut db: Connect
     RawJson(serde_json::to_string(&candidate).unwrap())
 }
 
-#[post("/api/jobs/<job_id>/candidates", data = "<data>")]
+#[post("/jobs/<job_id>/candidates", data = "<data>")]
 pub async fn add_candidate_to_job(job_id: &str, data: json::Json<LinkCandidateToJob>, mut db: Connection<MainDatabase>) -> RawJson<String> {
     let id = uuid::Uuid::new_v4();
     let job_uuid = uuid::Uuid::parse_str(job_id).unwrap();
@@ -177,7 +177,7 @@ pub async fn add_candidate_to_job(job_id: &str, data: json::Json<LinkCandidateTo
     RawJson(format!(r#"{{"success":true,"id":"{}","candidate_id":"{}"}}"#, id, data.candidate_id))
 }
 
-#[get("/api/jobs/<job_id>/candidates")]
+#[get("/jobs/<job_id>/candidates")]
 pub async fn get_job_candidates(job_id: &str, mut db: Connection<MainDatabase>) -> RawJson<String> {
     let job_uuid = uuid::Uuid::parse_str(job_id).unwrap();
 
@@ -230,7 +230,7 @@ pub async fn get_job_candidates(job_id: &str, mut db: Connection<MainDatabase>) 
 }
 
 #[allow(unused_variables)]
-#[delete("/api/jobs/<job_id>/candidates/<candidate_id>")]
+#[delete("/jobs/<job_id>/candidates/<candidate_id>")]
 pub async fn remove_candidate_from_job(job_id: &str, candidate_id: &str, mut db: Connection<MainDatabase>) -> RawJson<String> {
     let job_uuid = uuid::Uuid::parse_str(job_id).unwrap();
     let candidate_uuid = uuid::Uuid::parse_str(candidate_id).unwrap();
