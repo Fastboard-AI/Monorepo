@@ -8,7 +8,7 @@ AI-powered talent matching platform with team compatibility analysis.
 ├── backend/       # Rust API (Rocket + PostgreSQL + Gemini AI)
 ├── frontend/      # Next.js 16 (React 19 + Tailwind + Clerk Auth)
 ├── scraping/      # LinkedIn scraping (FastAPI + Playwright)
-├── web_scraping/  # General web scraping (FastAPI + Crawl4AI)
+├── web_scraping/  # Developer profile scraping (FastAPI + Crawl4AI + Gemini AI)
 └── docker-compose.yml
 ```
 
@@ -24,19 +24,27 @@ AI-powered talent matching platform with team compatibility analysis.
 
 ### 1. Configure Environment
 
-**Backend** (`backend/.env`):
+Create a `.env` file in the monorepo root (Docker Compose reads this automatically):
+
+```bash
+cp .env.example .env
+# Edit .env with your credentials
+```
+
+**Root `.env` file:**
 ```env
+# Backend
 GEMINI_API_KEY=your_gemini_api_key
 DATABASE_URL=postgresql://user:password@host/database?sslmode=require
 GITHUB_TOKEN=ghp_your_github_token
-```
 
-**Frontend** (`frontend/.env.local`):
-```env
+# Frontend
 NEXT_PUBLIC_API_URL=http://localhost:8000
 NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_test_...
 CLERK_SECRET_KEY=sk_test_...
 ```
+
+All services (backend, frontend, web-scraping) read from this single root `.env` file.
 
 ### 2. Create Database Tables
 
@@ -67,12 +75,21 @@ docker compose down
 
 ## Development (without Docker)
 
+For local development, you can either use the root `.env` file or create individual `.env` files in each service directory.
+
 ### Backend
 
 ```bash
 cd backend
+# Option 1: Create local .env
 cp .env.example .env
 # Edit .env with your credentials
+
+# Option 2: Or set env vars directly
+export GEMINI_API_KEY=...
+export DATABASE_URL=...
+export GITHUB_TOKEN=...
+
 cargo run
 ```
 
@@ -106,13 +123,14 @@ uv run python -m scraping.main --with-browser
 
 Service runs at http://localhost:8001
 
-### Web Scraping Service (Crawl4AI)
+### Web Scraping Service (Crawl4AI + Gemini)
 
 ```bash
 cd web_scraping
 uv sync
 uv run playwright install
 
+# Set GEMINI_API_KEY in environment or .env file
 uv run uvicorn web_scraping.main:app --reload --port 8002
 ```
 
@@ -121,6 +139,8 @@ Service runs at http://localhost:8002
 ---
 
 ## API Endpoints
+
+### Backend API (port 8000)
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
@@ -137,21 +157,21 @@ Service runs at http://localhost:8002
 | GET | `/api/teams/:id` | Get team |
 | PUT | `/api/teams/:id` | Update team |
 | DELETE | `/api/teams/:id` | Delete team |
-| POST | `/api/teams/:id/members` | Add team member (triggers code analysis if GitHub provided) |
+| POST | `/api/teams/:id/members` | Add team member (triggers code analysis + score recalc) |
 | PUT | `/api/teams/:id/members/:mid` | Update team member (re-triggers analysis if GitHub changes) |
-| DELETE | `/api/teams/:id/members/:mid` | Remove member |
+| DELETE | `/api/teams/:id/members/:mid` | Remove member (recalculates team score) |
 | POST | `/api/candidates` | Create candidate |
 | POST | `/api/sourcing/search` | AI candidate sourcing |
 | POST | `/add_to_db` | Add candidate with code analysis |
 | POST | `/analyse_repo` | Analyze GitHub repo (clones repo) |
-| POST | `/analyse_github` | Analyze GitHub user (via commits) |
+| POST | `/analyse_github` | Analyze GitHub user (full file analysis) |
 
 ### Web Scraping Service (port 8002)
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | GET | `/health` | Health check |
-| POST | `/api/developer/extract` | Extract developer profile from URL |
+| POST | `/api/developer/extract` | Extract developer profile using LLM |
 | POST | `/api/developer/batch` | Extract profiles from multiple URLs |
 | POST | `/api/developer/github` | Extract from GitHub profile |
 | POST | `/api/developer/portfolio` | Extract from portfolio site |
@@ -165,7 +185,12 @@ Service runs at http://localhost:8002
 
 ### Team Code Analysis
 
-When adding team members, you can provide their GitHub username, LinkedIn URL, and personal website. If a GitHub username is provided, the system automatically analyzes their code style in the background using Gemini AI.
+When adding team members with a GitHub username, the system analyzes their coding style using **full source file analysis**:
+
+1. Fetches up to 30 code files across 5 repositories
+2. Filters to actual code files (`.ts`, `.py`, `.rs`, `.go`, etc.)
+3. Excludes `node_modules/`, `vendor/`, minified files
+4. Sends up to 5,000 lines to Gemini AI for analysis
 
 **Code Characteristics Analyzed:**
 - Function size & complexity
@@ -179,19 +204,47 @@ When adding team members, you can provide their GitHub username, LinkedIn URL, a
 - Error handling style
 - Test structure
 
-This data is used to match candidates with compatible coding styles to existing team members.
+**Confidence Metrics:**
+The UI displays analysis confidence showing files analyzed, lines processed, and languages detected.
+
+### Team Compatibility Score
+
+Teams have a compatibility score (0-100) that **auto-recalculates** when members are added, removed, or updated.
+
+**Scoring Formula:**
+| Factor | Points |
+|--------|--------|
+| Base score | 70 |
+| Skill diversity | 0-15 |
+| Experience level mix | 0-10 |
+| Work style variety | 0-5 |
+| **Maximum** | **100** |
+
+Special cases:
+- Empty team: 0
+- Single member: 75
 
 ### Code Style Radar Chart
 
-Team members with analyzed code display a small chart badge on their avatar. Click any team member card to open a detail view showing:
+Team members with analyzed code display a chart badge on their avatar. Click any team member card to open a detail view showing:
 - Full profile with GitHub, LinkedIn, and website links
 - All skills and experience level
 - Work style preferences
+- Confidence metrics (files analyzed, lines, languages)
 - Interactive radar chart visualizing all 10 code metrics
 
 From the detail view, click **Edit** to update member details. If you change a team member's GitHub username, code analysis automatically re-runs in the background.
 
-This works in both the **Jobs** section (when viewing a linked team) and the **Teams** management page.
+### LLM-Powered Web Scraping
+
+The web scraping service uses **Gemini AI** to extract developer profiles from any webpage:
+
+1. Crawl page with Playwright (via Crawl4AI)
+2. Extract raw markdown, text, and links
+3. Send content to Gemini for intelligent extraction
+4. Return structured `DeveloperProfile` with name, title, bio, skills, projects, experience, education, and links
+
+This replaces brittle regex-based extraction with robust LLM understanding.
 
 ### Team Member Fields
 
@@ -238,8 +291,8 @@ This works in both the **Jobs** section (when viewing a linked team) and the **T
 **Web Scraping (Developer Profiles)**
 - Python 3.10
 - FastAPI
-- Crawl4AI
-- Playwright
+- Crawl4AI + Playwright
+- Google Gemini 2.0 Flash (LLM extraction)
 
 ---
 

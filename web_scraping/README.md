@@ -1,15 +1,24 @@
 # FastboardAI Web Scraping Service
 
-Web scraping service specialized for **developer profiles and portfolios** using [Crawl4AI](https://github.com/unclecode/crawl4ai) and FastAPI.
+Web scraping service specialized for **developer profiles and portfolios** using [Crawl4AI](https://github.com/unclecode/crawl4ai), FastAPI, and **Google Gemini AI** for intelligent extraction.
 
 ## Features
 
-- **Developer Profile Extraction**: Specialized parsing for developer pages
+- **LLM-Powered Extraction**: Uses Gemini AI to understand and extract developer info
+- **Developer Profile Extraction**: Intelligent parsing for any developer page
 - **GitHub Profile Support**: Extract info from GitHub user profiles
 - **Portfolio Parsing**: Parse personal portfolio websites
-- **Skill Detection**: Automatically detect technologies and skills
 - **Batch Processing**: Crawl multiple URLs concurrently
 - **Generic Crawling**: Raw markdown/text extraction for any URL
+
+## How It Works
+
+1. **Crawl**: Playwright-based browser fetches the page
+2. **Extract**: Raw markdown, text, and links are extracted
+3. **LLM Analysis**: Content is sent to Gemini AI for intelligent extraction
+4. **Structured Output**: Returns structured `DeveloperProfile` JSON
+
+This replaces brittle regex-based extraction with robust LLM understanding that can handle any page structure.
 
 ## What Gets Extracted
 
@@ -17,15 +26,17 @@ From developer pages, the service extracts:
 - **Name & Title**: Developer's name and job title
 - **Bio**: About/introduction text
 - **Location**: Where they're based
-- **Skills**: Programming languages, frameworks, tools
-- **Projects**: Portfolio projects with descriptions
-- **Experience**: Work history
-- **Links**: GitHub, LinkedIn, Twitter, email
+- **Skills**: Programming languages, frameworks, tools (any technology)
+- **Projects**: Portfolio projects with descriptions, URLs, technologies
+- **Experience**: Work history with title, company, duration
+- **Education**: Degrees, institutions, fields
+- **Links**: GitHub, LinkedIn, Twitter, portfolio, blog, email, resume
 
 ## Prerequisites
 
 - Python 3.10+
 - [UV](https://docs.astral.sh/uv/) package manager
+- Google Gemini API key
 
 ## Setup
 
@@ -52,6 +63,12 @@ From developer pages, the service extracts:
 4. **Configure environment**
    ```bash
    cp .env.example .env
+   # Add your GEMINI_API_KEY to .env
+   ```
+
+   Or set the environment variable:
+   ```bash
+   export GEMINI_API_KEY=your_api_key_here
    ```
 
 ## Usage
@@ -68,7 +85,7 @@ uv run uvicorn web_scraping.main:app --reload --port 8002
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| POST | `/api/developer/extract` | Extract developer profile from any URL |
+| POST | `/api/developer/extract` | Extract developer profile using LLM |
 | POST | `/api/developer/batch` | Extract profiles from multiple URLs |
 | POST | `/api/developer/github` | Extract from GitHub profile |
 | POST | `/api/developer/portfolio` | Extract from portfolio site |
@@ -105,18 +122,29 @@ curl -X POST http://localhost:8002/api/developer/extract \
     "title": "Senior Software Engineer",
     "bio": "Building cool stuff...",
     "location": "Sydney, Australia",
-    "skills": ["Python", "TypeScript", "React", "AWS"],
+    "skills": ["Python", "TypeScript", "React", "AWS", "Docker"],
     "projects": [
       {
         "name": "awesome-project",
-        "description": "A cool project",
-        "url": "https://github.com/username/awesome-project"
+        "description": "A cool project that does amazing things",
+        "url": "https://github.com/username/awesome-project",
+        "technologies": ["Python", "FastAPI", "PostgreSQL"]
       }
     ],
     "experience": [
       {
         "title": "Software Engineer",
-        "company": "Tech Corp"
+        "company": "Tech Corp",
+        "duration": "2020 - Present",
+        "description": "Building scalable backend systems"
+      }
+    ],
+    "education": [
+      {
+        "degree": "Bachelor of Science",
+        "institution": "University of Technology",
+        "year": "2019",
+        "field": "Computer Science"
       }
     ],
     "links": {
@@ -156,26 +184,6 @@ curl -X POST http://localhost:8002/api/developer/batch \
   }'
 ```
 
-## Supported Page Types
-
-| Type | Description | Example |
-|------|-------------|---------|
-| `github` | GitHub user profiles | github.com/username |
-| `portfolio` | Personal portfolio sites | johndoe.dev |
-| `blog` | Developer blogs | dev.to/username |
-| `auto` | Auto-detect from URL | (any) |
-
-## Detected Skills
-
-The service automatically detects 80+ technologies including:
-
-- **Languages**: Python, JavaScript, TypeScript, Java, Go, Rust, C++, etc.
-- **Frontend**: React, Vue, Angular, Next.js, Tailwind, etc.
-- **Backend**: Node.js, Django, FastAPI, Spring, etc.
-- **Databases**: PostgreSQL, MongoDB, Redis, etc.
-- **Cloud/DevOps**: AWS, Docker, Kubernetes, etc.
-- **AI/ML**: TensorFlow, PyTorch, etc.
-
 ## Project Structure
 
 ```
@@ -195,7 +203,8 @@ web_scraping/
         ├── crawler/
         │   ├── __init__.py
         │   ├── service.py       # Crawl4AI service
-        │   └── developer.py     # Developer profile extractor
+        │   ├── developer.py     # Developer profile extractor
+        │   └── llm.py           # Gemini LLM extraction
         └── models/
             ├── __init__.py
             └── schemas.py       # Pydantic models
@@ -209,16 +218,25 @@ Build and run with Docker:
 # Build image
 docker build -t fastboard-web-scraping .
 
-# Run container
-docker run -p 8002:8002 fastboard-web-scraping
+# Run container (pass GEMINI_API_KEY)
+docker run -p 8002:8002 -e GEMINI_API_KEY=your_key fastboard-web-scraping
 
 # Or use docker compose from monorepo root
 docker compose up web-scraping --build
 ```
 
+## Environment Variables
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `GEMINI_API_KEY` | Yes | Google Gemini API key for LLM extraction |
+| `HOST` | No | Host to bind to (default: 0.0.0.0) |
+| `PORT` | No | Port to bind to (default: 8002) |
+
 ## Notes
 
 - First request may be slow as it initializes the browser
-- GitHub profiles work best with a README in the profile
-- Skill detection uses keyword matching (not AI)
+- LLM extraction provides much better results than regex-based parsing
+- The service handles any page structure - no hardcoded patterns
 - Rate limiting is recommended for batch requests
+- Gemini API has usage limits - monitor your quota
