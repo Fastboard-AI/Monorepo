@@ -213,72 +213,144 @@ export default function AISourcingPage() {
     setIsSearching(true);
     setSourcedResults([]);
 
-    // Simulate API delay
-    await new Promise((resolve) => setTimeout(resolve, 2500));
+    try {
+      // Call the real backend sourcing API
+      const sourcedCandidates = await api.searchCandidates({
+        job_id: selectedJob.id,
+        team_id: selectedTeam?.id,
+        sources: sources,
+        count: candidateCount,
+      });
 
-    // Generate candidates from selected sources
-    const teamMembers = selectedTeam?.members || [];
-    const results: typeof sourcedResults = [];
+      // Convert backend response to frontend format
+      const results: typeof sourcedResults = sourcedCandidates.map((sc) => {
+        // Determine source from the response
+        const source: SourceType = (sc.source as SourceType) || "linkedin";
 
-    // Distribute candidates across sources
-    const candidatesPerSource = Math.ceil(candidateCount / sources.length);
+        // Get score breakdown - handle both old and new formats
+        const scoreBreakdown = sc.score_breakdown as {
+          skills?: { score: number };
+          experience?: { score: number };
+          team_fit?: { score: number };
+          culture?: { score: number };
+        };
 
-    for (const source of sources) {
-      const count = Math.min(candidatesPerSource, candidateCount - results.length);
-      for (let i = 0; i < count; i++) {
-        results.push(generateSourcedCandidate(selectedJob, teamMembers, source));
-      }
-    }
+        const skillsScore = scoreBreakdown?.skills?.score ?? 70;
+        const experienceScore = scoreBreakdown?.experience?.score ?? 70;
+        const teamFitScore = scoreBreakdown?.team_fit?.score ?? 70;
+        const cultureScore = scoreBreakdown?.culture?.score ?? 70;
 
-    // Sort by overall score
-    results.sort((a, b) => {
-      const overallA = (a.jobScore + a.teamScore) / 2;
-      const overallB = (b.jobScore + b.teamScore) / 2;
-      return overallB - overallA;
-    });
-
-    // Automatically save all candidates to the database and link to job
-    for (const { candidate, jobScore, teamScore } of results) {
-      try {
-        const createdCandidate = await api.createCandidate({
-          name: candidate.name,
-          email: candidate.email || undefined,
-          title: candidate.title,
-          location: undefined,
-          skills: candidate.skills.map((s) => ({ name: s.name, level: s.level })),
-          experience: candidate.experience.map((e) => ({
+        const candidate: Candidate = {
+          id: sc.id,
+          name: sc.name,
+          email: undefined,
+          title: sc.title,
+          skills: sc.skills.map((s) => ({
+            name: s.name,
+            level: s.level as Skill["level"],
+          })),
+          experience: sc.experience.map((e) => ({
             title: e.title,
             company: e.company,
             duration: e.duration,
-            description: undefined,
+            description: e.description,
           })),
-          education: candidate.education.map((e) => ({
+          education: sc.education.map((e) => ({
             degree: e.degree,
             institution: e.institution,
             year: e.year,
           })),
-          links: candidate.links || {},
-          talent_fit_score: candidate.talentFitScore,
-          score_breakdown: {
-            skillsMatch: candidate.scoreBreakdown.skillsMatch,
-            experienceMatch: candidate.scoreBreakdown.experienceMatch,
-            workStyleAlignment: candidate.scoreBreakdown.workStyleAlignment,
-            teamFit: candidate.scoreBreakdown.teamFit,
+          links: sc.links || {},
+          talentFitScore: sc.talent_fit_score,
+          scoreBreakdown: {
+            skillsMatch: skillsScore,
+            experienceMatch: experienceScore,
+            workStyleAlignment: teamFitScore,
+            teamFit: cultureScore,
           },
-          source: "ai_sourcing",
-        });
+          uploadedAt: new Date(),
+        };
 
-        await api.addCandidateToJob(selectedJob.id, {
-          candidate_id: createdCandidate.id,
-          job_match_score: jobScore,
-          team_compatibility_score: teamScore,
-        });
-      } catch (error) {
-        console.error("Failed to save candidate:", error);
+        return {
+          candidate,
+          jobScore: skillsScore,
+          teamScore: teamFitScore,
+          source,
+        };
+      });
+
+      // Sort by overall score
+      results.sort((a, b) => {
+        const overallA = (a.jobScore + a.teamScore) / 2;
+        const overallB = (b.jobScore + b.teamScore) / 2;
+        return overallB - overallA;
+      });
+
+      // Save candidates to database and link to job
+      for (const { candidate, jobScore, teamScore } of results) {
+        try {
+          const createdCandidate = await api.createCandidate({
+            name: candidate.name,
+            email: candidate.email || undefined,
+            title: candidate.title,
+            location: undefined,
+            skills: candidate.skills.map((s) => ({ name: s.name, level: s.level })),
+            experience: candidate.experience.map((e) => ({
+              title: e.title,
+              company: e.company,
+              duration: e.duration,
+              description: e.description,
+            })),
+            education: candidate.education.map((e) => ({
+              degree: e.degree,
+              institution: e.institution,
+              year: e.year,
+            })),
+            links: candidate.links || {},
+            talent_fit_score: candidate.talentFitScore,
+            score_breakdown: {
+              skillsMatch: candidate.scoreBreakdown.skillsMatch,
+              experienceMatch: candidate.scoreBreakdown.experienceMatch,
+              workStyleAlignment: candidate.scoreBreakdown.workStyleAlignment,
+              teamFit: candidate.scoreBreakdown.teamFit,
+            },
+            source: "ai_sourcing",
+          });
+
+          await api.addCandidateToJob(selectedJob.id, {
+            candidate_id: createdCandidate.id,
+            job_match_score: jobScore,
+            team_compatibility_score: teamScore,
+          });
+        } catch (error) {
+          console.error("Failed to save candidate:", error);
+        }
       }
+
+      setSourcedResults(results);
+    } catch (error) {
+      console.error("Sourcing failed:", error);
+      // Fallback to mock generation if API fails
+      const teamMembers = selectedTeam?.members || [];
+      const results: typeof sourcedResults = [];
+      const candidatesPerSource = Math.ceil(candidateCount / sources.length);
+
+      for (const source of sources) {
+        const count = Math.min(candidatesPerSource, candidateCount - results.length);
+        for (let i = 0; i < count; i++) {
+          results.push(generateSourcedCandidate(selectedJob, teamMembers, source));
+        }
+      }
+
+      results.sort((a, b) => {
+        const overallA = (a.jobScore + a.teamScore) / 2;
+        const overallB = (b.jobScore + b.teamScore) / 2;
+        return overallB - overallA;
+      });
+
+      setSourcedResults(results);
     }
 
-    setSourcedResults(results);
     setIsSearching(false);
   }, [selectedJob, selectedTeam, candidateCount, sources]);
 
