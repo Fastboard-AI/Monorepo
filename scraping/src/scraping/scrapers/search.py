@@ -123,14 +123,14 @@ class ProfileSearcher:
         results = []
         try:
             logger.info(f"Executing DDG search: {query}")
-            # duckduckgo_search v8+ API - use lite backend without timelimit
-            # timelimit forces Bing backend which doesn't return LinkedIn profiles
+            # duckduckgo_search v8+ API
+            # Use html backend - lite backend now routes through Bing which filters LinkedIn
             ddgs_results = DDGS().text(
                 query,
                 region='wt-wt',  # worldwide
                 safesearch='off',
-                timelimit=None,  # timelimit uses Bing which blocks LinkedIn
-                backend='lite',  # lite backend works for LinkedIn searches
+                timelimit=None,
+                backend='html',  # html backend scrapes DuckDuckGo directly
                 max_results=max_results,
             )
 
@@ -274,7 +274,7 @@ class DevSiteSearcher:
                 region='wt-wt',
                 safesearch='off',
                 timelimit=None,
-                backend='lite',
+                backend='html',
                 max_results=max_results,
             )
             self.logger.info(f"Got {len(results) if results else 0} results")

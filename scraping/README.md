@@ -315,7 +315,7 @@ scraping/
 
 ### Search Limitations
 
-- DuckDuckGo search uses the `lite` backend for best results
+- DuckDuckGo search uses the `html` backend for best results
 - Time filters (`timeframe`) are disabled as they force Bing backend which blocks LinkedIn
 - Results quality depends on the person's online presence
 - Well-known developers yield better results than obscure names
@@ -351,7 +351,7 @@ CREATE TABLE profiles (
 ## Troubleshooting
 
 **Empty search results:**
-- The `lite` backend should be used (no `timelimit`)
+- The `html` backend should be used (no `timelimit`)
 - Check if the search query is too specific
 - Try broader keywords
 

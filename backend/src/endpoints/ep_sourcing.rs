@@ -2,7 +2,6 @@ use rocket::{post, serde::json};
 use rocket::response::content::RawJson;
 use rocket_db_pools::Connection;
 use serde::{Deserialize, Serialize};
-use rand::Rng;
 use sqlx::Row;
 use std::collections::HashSet;
 use genai::{Client, chat::{ChatMessage, ChatOptions, ChatRequest}};
@@ -35,11 +34,27 @@ struct SearchRequest {
     targets: Vec<SearchTarget>,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Debug, Clone)]
 struct ProfileSearchResult {
     href: String,
     title: Option<String>,
     description: Option<String>,
+    // AI-extracted fields (populated after filtering)
+    #[serde(default)]
+    actual_role: Option<String>,
+    #[serde(default)]
+    actual_location: Option<String>,
+}
+
+#[derive(Deserialize, Debug)]
+#[allow(dead_code)]
+struct RelevanceFilterResult {
+    index: usize,
+    is_relevant: bool,
+    actual_role: Option<String>,
+    actual_location: Option<String>,
+    #[serde(default)]
+    reason: Option<String>, // Used for debugging rejected candidates
 }
 
 /// Call the Python scraping service to search for LinkedIn profiles via DuckDuckGo
@@ -85,6 +100,38 @@ async fn search_linkedin_profiles(
 // ============================================
 // AI-Powered Query Expansion
 // ============================================
+
+// ============================================
+// AI-Powered Relevance Filtering
+// ============================================
+
+const BATCH_RELEVANCE_PROMPT: &str = r#"Analyze these LinkedIn search results for a {job_title} position in {job_location}.
+
+For each result, determine:
+1. Is this person in a role relevant to the job? (e.g., tech/engineering roles for tech jobs)
+2. Are they located in or near the target location?
+
+Results to analyze:
+{results_json}
+
+Return a JSON array with one entry per result (same order, same indices):
+[
+  {"index": 0, "is_relevant": true, "actual_role": "Software Engineer", "actual_location": "Sydney, Australia"},
+  {"index": 1, "is_relevant": false, "reason": "unrelated field - freelance writer"},
+  ...
+]
+
+Be strict - mark is_relevant as FALSE if:
+- They are in an unrelated profession (writer, marketing, sales, HR, recruiter, etc. for a tech job)
+- They are in a completely different country/region than the target location
+- The result is not actually a person's LinkedIn profile (company page, job listing, etc.)
+- The description doesn't indicate they work in the relevant field
+
+For relevant candidates, extract:
+- actual_role: Their current job title (best guess from the snippet)
+- actual_location: Their location (city, country) if mentioned, or "Unknown"
+
+Return ONLY the JSON array, no additional text."#;
 
 const QUERY_EXPANSION_PROMPT: &str = r#"Given a job title, generate 5-8 alternative search terms that would find similar professionals on LinkedIn.
 
@@ -249,7 +296,139 @@ fn get_fallback_variations(job_title: &str) -> Vec<String> {
     variations
 }
 
-/// Search LinkedIn with multiple query variations and deduplicate results
+/// Filter candidates using AI to check relevance to job and location
+async fn batch_filter_candidates(
+    results: &[ProfileSearchResult],
+    job_title: &str,
+    job_location: &str,
+) -> Vec<(usize, String, String)> {
+    if results.is_empty() {
+        return vec![];
+    }
+
+    println!("[Sourcing] Filtering {} candidates with AI relevance check", results.len());
+
+    // Build JSON array of results for the prompt
+    let results_for_prompt: Vec<serde_json::Value> = results.iter().enumerate().map(|(i, r)| {
+        serde_json::json!({
+            "index": i,
+            "title": r.title.as_deref().unwrap_or("Unknown"),
+            "description": r.description.as_deref().unwrap_or("No description"),
+        })
+    }).collect();
+
+    let results_json = serde_json::to_string_pretty(&results_for_prompt)
+        .unwrap_or_else(|_| "[]".to_string());
+
+    let prompt = BATCH_RELEVANCE_PROMPT
+        .replace("{job_title}", job_title)
+        .replace("{job_location}", job_location)
+        .replace("{results_json}", &results_json);
+
+    let client = Client::default();
+    let options = ChatOptions::default().with_temperature(0.2);
+
+    let chat_req = ChatRequest::new(vec![
+        ChatMessage::user(prompt),
+    ]);
+
+    match client.exec_chat(MODEL_GEMINI, chat_req, Some(&options)).await {
+        Ok(chat_res) => {
+            if let Some(response) = chat_res.content.joined_texts() {
+                // Parse JSON array from response
+                let cleaned = response.trim();
+                let json_str = if cleaned.starts_with('[') {
+                    cleaned.to_string()
+                } else if let Some(start) = cleaned.find('[') {
+                    if let Some(end) = cleaned.rfind(']') {
+                        cleaned[start..=end].to_string()
+                    } else {
+                        println!("[Sourcing] AI filter response missing closing bracket");
+                        return fallback_filter(results);
+                    }
+                } else {
+                    println!("[Sourcing] AI filter response not valid JSON array");
+                    return fallback_filter(results);
+                };
+
+                match serde_json::from_str::<Vec<RelevanceFilterResult>>(&json_str) {
+                    Ok(filter_results) => {
+                        let relevant: Vec<(usize, String, String)> = filter_results
+                            .into_iter()
+                            .filter(|r| r.is_relevant)
+                            .map(|r| (
+                                r.index,
+                                r.actual_role.unwrap_or_else(|| "Unknown".to_string()),
+                                r.actual_location.unwrap_or_else(|| "Unknown".to_string()),
+                            ))
+                            .collect();
+
+                        println!("[Sourcing] AI filter: {} of {} candidates are relevant", relevant.len(), results.len());
+                        relevant
+                    }
+                    Err(e) => {
+                        println!("[Sourcing] Failed to parse AI filter response: {}. Using fallback.", e);
+                        fallback_filter(results)
+                    }
+                }
+            } else {
+                println!("[Sourcing] Empty AI filter response. Using fallback.");
+                fallback_filter(results)
+            }
+        }
+        Err(e) => {
+            println!("[Sourcing] AI filter failed: {}. Using fallback.", e);
+            fallback_filter(results)
+        }
+    }
+}
+
+/// Fallback filter when AI is unavailable - basic keyword filtering
+fn fallback_filter(results: &[ProfileSearchResult]) -> Vec<(usize, String, String)> {
+    // Keywords that indicate non-tech roles
+    let exclude_keywords = [
+        "writer", "writing", "copywriter", "content creator", "journalist",
+        "marketing", "marketer", "sales", "account executive", "recruiter",
+        "hr", "human resources", "talent acquisition", "photographer",
+        "designer" /* unless UI/UX */, "artist", "musician", "actor",
+        "teacher", "professor", "nurse", "doctor", "lawyer", "attorney",
+        "accountant", "financial advisor", "real estate", "realtor",
+    ];
+
+    let include_keywords = [
+        "engineer", "developer", "software", "programmer", "coding",
+        "data", "machine learning", "ml", "ai", "devops", "sre",
+        "architect", "technical", "backend", "frontend", "fullstack",
+        "full stack", "cloud", "platform", "infrastructure",
+    ];
+
+    results.iter().enumerate().filter_map(|(i, r)| {
+        let title_lower = r.title.as_deref().unwrap_or("").to_lowercase();
+        let desc_lower = r.description.as_deref().unwrap_or("").to_lowercase();
+        let combined = format!("{} {}", title_lower, desc_lower);
+
+        // Check for exclusions
+        let has_exclusion = exclude_keywords.iter().any(|kw| combined.contains(kw));
+
+        // Check for inclusions (at least one tech keyword)
+        let has_inclusion = include_keywords.iter().any(|kw| combined.contains(kw));
+
+        // Include if has tech keyword and no exclusion, OR if we can't determine
+        if has_inclusion && !has_exclusion {
+            // Try to extract role from title
+            let (_, role) = parse_linkedin_title(r.title.as_deref().unwrap_or("Unknown"));
+            Some((i, role, "Unknown".to_string()))
+        } else if !has_exclusion && !has_inclusion {
+            // Uncertain - include with unknown role
+            let (_, role) = parse_linkedin_title(r.title.as_deref().unwrap_or("Unknown"));
+            Some((i, role, "Unknown".to_string()))
+        } else {
+            None
+        }
+    }).collect()
+}
+
+/// Search LinkedIn with multiple query variations, deduplicate, and filter results
 async fn search_linkedin_with_expansion(
     job_title: &str,
     location: &str,
@@ -281,14 +460,30 @@ async fn search_linkedin_with_expansion(
         // Small delay between queries to avoid rate limiting
         tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
 
-        // Stop if we have enough results
-        if all_results.len() >= count as usize * 2 {
+        // Stop if we have enough raw results to filter
+        if all_results.len() >= count as usize * 3 {
             break;
         }
     }
 
-    println!("[Sourcing] Total unique profiles from all queries: {}", all_results.len());
-    all_results
+    println!("[Sourcing] Total unique profiles before filtering: {}", all_results.len());
+
+    // Apply AI relevance filter
+    let relevant_indices = batch_filter_candidates(&all_results, job_title, location).await;
+
+    // Build filtered results with AI-extracted data
+    let mut filtered_results: Vec<ProfileSearchResult> = Vec::new();
+    for (index, actual_role, actual_location) in relevant_indices {
+        if index < all_results.len() {
+            let mut result = all_results[index].clone();
+            result.actual_role = Some(actual_role);
+            result.actual_location = Some(actual_location);
+            filtered_results.push(result);
+        }
+    }
+
+    println!("[Sourcing] Filtered to {} relevant profiles", filtered_results.len());
+    filtered_results
 }
 
 /// Parse a LinkedIn search result title to extract name and job title
@@ -348,12 +543,20 @@ fn convert_search_result_to_candidate(
     source: &str,
 ) -> Option<GeneratedCandidateData> {
     let title = result.title.as_ref()?;
-    let (name, job_title) = parse_linkedin_title(title);
+    let (name, parsed_job_title) = parse_linkedin_title(title);
 
     // Skip if name looks invalid
     if name.is_empty() || name.len() < 3 {
         return None;
     }
+
+    // Use AI-extracted role if available, otherwise fall back to parsed title
+    let job_title = result.actual_role.clone()
+        .unwrap_or(parsed_job_title);
+
+    // Use AI-extracted location if available
+    let location = result.actual_location.clone()
+        .unwrap_or_else(|| "Unknown".to_string());
 
     // Extract skills from description
     let description = result.description.as_deref().unwrap_or("");
@@ -390,7 +593,7 @@ fn convert_search_result_to_candidate(
         id: uuid::Uuid::new_v4().to_string(),
         name,
         title: job_title,
-        location: "Unknown".to_string(), // Would need scraping to get this
+        location,
         skills,
         candidate_skills,
         experience,
@@ -487,47 +690,6 @@ impl From<ExplainableScore> for ScoreDetail {
     }
 }
 
-const FIRST_NAMES: &[&str] = &[
-    "Alex", "Jordan", "Taylor", "Morgan", "Casey", "Riley", "Quinn", "Avery",
-    "Jamie", "Cameron", "Drew", "Blake", "Reese", "Parker", "Hayden", "Emery",
-    "Sage", "River", "Phoenix", "Rowan", "Finley", "Sawyer", "Marlowe", "Eden"
-];
-
-const LAST_NAMES: &[&str] = &[
-    "Chen", "Patel", "Kim", "Williams", "Garcia", "Johnson", "Lee", "Martinez",
-    "Brown", "Davis", "Wilson", "Anderson", "Taylor", "Thomas", "Moore", "Jackson",
-    "White", "Harris", "Martin", "Thompson", "Young", "Allen", "King", "Wright"
-];
-
-const TITLES: &[&str] = &[
-    "Senior Software Engineer", "Full Stack Developer", "Frontend Engineer",
-    "Backend Developer", "DevOps Engineer", "Data Engineer", "ML Engineer",
-    "Platform Engineer", "Staff Engineer", "Engineering Lead"
-];
-
-const LOCATIONS: &[&str] = &[
-    "San Francisco, CA", "New York, NY", "Seattle, WA", "Austin, TX",
-    "Boston, MA", "Denver, CO", "Los Angeles, CA", "Chicago, IL",
-    "Portland, OR", "Remote"
-];
-
-const SKILLS: &[&str] = &[
-    "TypeScript", "React", "Node.js", "Python", "Rust", "Go", "PostgreSQL",
-    "MongoDB", "AWS", "Docker", "Kubernetes", "GraphQL", "REST APIs",
-    "System Design", "CI/CD", "TDD", "Agile", "Leadership"
-];
-
-const COMPANIES: &[&str] = &[
-    "Google", "Meta", "Amazon", "Microsoft", "Apple", "Netflix", "Stripe",
-    "Airbnb", "Uber", "Spotify", "Slack", "Dropbox", "Coinbase", "Figma",
-    "Notion", "Linear", "Vercel", "Cloudflare", "DataDog", "Snowflake"
-];
-
-const UNIVERSITIES: &[&str] = &[
-    "MIT", "Stanford", "UC Berkeley", "Carnegie Mellon", "Georgia Tech",
-    "University of Washington", "UCLA", "UT Austin", "UIUC", "Cornell"
-];
-
 /// Job data fetched from database for scoring
 struct JobData {
     required_skills: Vec<RequiredSkill>,
@@ -577,108 +739,6 @@ struct GeneratedCandidateData {
     education: Vec<Education>,
     links: Links,
     source: String,
-}
-
-fn generate_candidate_data(source: &str) -> GeneratedCandidateData {
-    let mut rng = rand::thread_rng();
-
-    let first = FIRST_NAMES[rng.gen_range(0..FIRST_NAMES.len())];
-    let last = LAST_NAMES[rng.gen_range(0..LAST_NAMES.len())];
-    let name = format!("{} {}", first, last);
-
-    let username = format!("{}{}", first.to_lowercase(), rng.gen_range(100..999));
-
-    // Generate random skills for the mock candidate
-    let num_skills = rng.gen_range(4..8);
-    let candidate_skills: Vec<CandidateSkill> = (0..num_skills)
-        .map(|_| {
-            let skill = SKILLS[rng.gen_range(0..SKILLS.len())];
-            let level = match rng.gen_range(0..4) {
-                0 => "expert",
-                1 => "advanced",
-                2 => "intermediate",
-                _ => "beginner",
-            };
-            CandidateSkill {
-                name: skill.to_string(),
-                level: level.to_string(),
-            }
-        })
-        .collect();
-
-    // Convert to SkillMatch for response
-    let skills: Vec<SkillMatch> = candidate_skills.iter()
-        .map(|s| SkillMatch {
-            name: s.name.clone(),
-            level: s.level.clone(),
-            match_type: "exact".to_string(),
-        })
-        .collect();
-
-    // Generate random experience
-    let num_exp = rng.gen_range(2..4);
-    let experience: Vec<Experience> = (0..num_exp)
-        .map(|i| {
-            let years = if i == 0 { rng.gen_range(1..3) } else { rng.gen_range(2..5) };
-            Experience {
-                title: TITLES[rng.gen_range(0..TITLES.len())].to_string(),
-                company: COMPANIES[rng.gen_range(0..COMPANIES.len())].to_string(),
-                duration: format!("{} years", years),
-                description: "Led development of key features and mentored junior engineers.".to_string(),
-            }
-        })
-        .collect();
-
-    // Convert to CandidateExperience for scoring
-    let candidate_experience: Vec<CandidateExperience> = experience.iter()
-        .map(|e| CandidateExperience {
-            title: e.title.clone(),
-            company: e.company.clone(),
-            duration: e.duration.clone(),
-            description: Some(e.description.clone()),
-        })
-        .collect();
-
-    let education = vec![Education {
-        degree: "B.S. Computer Science".to_string(),
-        institution: UNIVERSITIES[rng.gen_range(0..UNIVERSITIES.len())].to_string(),
-        year: format!("{}", rng.gen_range(2015..2023)),
-    }];
-
-    let links = match source {
-        "github" => Links {
-            github: Some(format!("https://github.com/{}", username)),
-            linkedin: None,
-            portfolio: if rng.gen_bool(0.3) { Some(format!("https://{}.dev", username)) } else { None },
-        },
-        "linkedin" => Links {
-            github: if rng.gen_bool(0.5) { Some(format!("https://github.com/{}", username)) } else { None },
-            linkedin: Some(format!("https://linkedin.com/in/{}", username)),
-            portfolio: None,
-        },
-        _ => Links {
-            github: Some(format!("https://github.com/{}", username)),
-            linkedin: Some(format!("https://linkedin.com/in/{}", username)),
-            portfolio: if rng.gen_bool(0.3) { Some(format!("https://{}.dev", username)) } else { None },
-        },
-    };
-
-    let title = TITLES[rng.gen_range(0..TITLES.len())].to_string();
-    let location = LOCATIONS[rng.gen_range(0..LOCATIONS.len())].to_string();
-
-    GeneratedCandidateData {
-        id: uuid::Uuid::new_v4().to_string(),
-        name,
-        title,
-        location,
-        skills,
-        candidate_skills,
-        experience,
-        candidate_experience,
-        education,
-        links,
-        source: source.to_string(),
-    }
 }
 
 async fn score_candidate(
@@ -837,16 +897,6 @@ pub async fn search_candidates(
             if let Some(candidate) = convert_search_result_to_candidate(result, "linkedin") {
                 candidate_data.push(candidate);
             }
-        }
-    }
-
-    // If we didn't get enough candidates from real search, fill with mock data
-    let remaining = (count as usize).saturating_sub(candidate_data.len());
-    if remaining > 0 {
-        println!("[Sourcing] Generating {} mock candidates to fill remaining slots", remaining);
-        for i in 0..remaining {
-            let source = &sources[i % sources.len()];
-            candidate_data.push(generate_candidate_data(source));
         }
     }
 
