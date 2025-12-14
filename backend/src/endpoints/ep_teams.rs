@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use rocket::{get, post, put, delete, serde::json};
 use rocket_db_pools::Connection;
 use rocket::response::content::RawJson;
@@ -71,6 +72,83 @@ struct TeamRow {
     members: Vec<TeamMemberRow>,
     created_at: String,
     updated_at: String,
+}
+
+/// Calculate team compatibility score based on members
+fn calculate_team_score(members: &[TeamMemberRow]) -> i32 {
+    if members.is_empty() { return 0; }
+    if members.len() == 1 { return 75; }
+
+    // Skill diversity (up to 15 points)
+    let all_skills: Vec<&str> = members.iter()
+        .flat_map(|m| m.skills.iter().map(|s| s.name.as_str()))
+        .collect();
+    let unique_skills: HashSet<_> = all_skills.iter().collect();
+    let skill_diversity = (unique_skills.len() as f32 / (members.len() * 2) as f32).min(1.0);
+
+    // Experience diversity (up to 10 points)
+    let exp_levels: HashSet<_> = members.iter()
+        .map(|m| m.experience_level.as_str())
+        .collect();
+    let exp_diversity = exp_levels.len() as f32 / 4.0;
+
+    // Work style variety (up to 5 points)
+    let comm_styles: HashSet<_> = members.iter()
+        .map(|m| m.work_style.communication.as_str())
+        .collect();
+    let collab_styles: HashSet<_> = members.iter()
+        .map(|m| m.work_style.collaboration.as_str())
+        .collect();
+    let has_variety = comm_styles.len() > 1 || collab_styles.len() > 1;
+
+    let base_score = 70.0;
+    let diversity_bonus = skill_diversity * 15.0 + exp_diversity * 10.0;
+    let style_bonus = if has_variety { 5.0 } else { 0.0 };
+
+    (base_score + diversity_bonus + style_bonus).min(100.0).round() as i32
+}
+
+/// Fetch team members and recalculate team score
+async fn recalculate_and_update_team_score(
+    team_id: uuid::Uuid,
+    db: &mut Connection<MainDatabase>
+) {
+    let rows = sqlx::query(
+        "SELECT id, name, role, skills, experience_level, work_style, github, linkedin, website, code_characteristics FROM team_members WHERE team_id = $1"
+    )
+    .bind(team_id)
+    .fetch_all(&mut ***db)
+    .await
+    .unwrap_or_default();
+
+    let members: Vec<TeamMemberRow> = rows.into_iter().map(|m| {
+        let skills_json: Option<serde_json::Value> = m.get("skills");
+        let work_style_json: Option<serde_json::Value> = m.get("work_style");
+        TeamMemberRow {
+            id: m.get::<uuid::Uuid, _>("id").to_string(),
+            name: m.get("name"),
+            role: m.get("role"),
+            skills: serde_json::from_value(skills_json.unwrap_or(serde_json::json!([]))).unwrap_or_default(),
+            experience_level: m.get::<Option<String>, _>("experience_level").unwrap_or_else(|| "mid".to_string()),
+            work_style: serde_json::from_value(work_style_json.unwrap_or(serde_json::json!({"communication":"mixed","collaboration":"balanced","pace":"steady"}))).unwrap_or(WorkStyle {
+                communication: "mixed".to_string(),
+                collaboration: "balanced".to_string(),
+                pace: "steady".to_string(),
+            }),
+            github: m.get("github"),
+            linkedin: m.get("linkedin"),
+            website: m.get("website"),
+            code_characteristics: m.get("code_characteristics"),
+        }
+    }).collect();
+
+    let score = calculate_team_score(&members);
+
+    let _ = sqlx::query("UPDATE teams SET compatibility_score = $1, updated_at = NOW() WHERE id = $2")
+        .bind(score)
+        .bind(team_id)
+        .execute(&mut ***db)
+        .await;
 }
 
 #[get("/teams")]
@@ -306,6 +384,9 @@ pub async fn add_team_member<'a>(team_id: &str, data: json::Json<CreateTeamMembe
         }
     }
 
+    // Recalculate team score after adding member
+    recalculate_and_update_team_score(team_uuid, &mut db).await;
+
     let member = TeamMemberRow {
         id: id.to_string(),
         name: data.name.to_string(),
@@ -322,16 +403,19 @@ pub async fn add_team_member<'a>(team_id: &str, data: json::Json<CreateTeamMembe
     RawJson(serde_json::to_string(&member).unwrap())
 }
 
-#[allow(unused_variables)]
 #[delete("/teams/<team_id>/members/<member_id>")]
 pub async fn remove_team_member(team_id: &str, member_id: &str, mut db: Connection<MainDatabase>) -> RawJson<String> {
     let member_uuid = uuid::Uuid::parse_str(member_id).unwrap();
+    let team_uuid = uuid::Uuid::parse_str(team_id).unwrap();
 
     sqlx::query("DELETE FROM team_members WHERE id = $1")
         .bind(member_uuid)
         .execute(&mut **db)
         .await
         .unwrap();
+
+    // Recalculate team score after removing member
+    recalculate_and_update_team_score(team_uuid, &mut db).await;
 
     RawJson(format!(r#"{{"success":true,"id":"{}"}}"#, member_id))
 }
@@ -438,6 +522,10 @@ pub async fn update_team_member<'a>(
             .bind(member_uuid)
             .execute(&mut **db).await.unwrap();
     }
+
+    // Recalculate team score after updating member
+    let team_uuid = uuid::Uuid::parse_str(team_id).unwrap();
+    recalculate_and_update_team_score(team_uuid, &mut db).await;
 
     // Fetch and return updated member
     let row = sqlx::query(
