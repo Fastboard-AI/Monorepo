@@ -183,7 +183,16 @@ pub async fn generate_take_home(
     // Generate projects
     let projects: TakeHomeProjects = match generate_take_home_projects(&candidate_context, &job_context).await {
         Ok(p) => p,
-        Err(e) => return RawJson(format!(r#"{{"error": "Failed to generate projects: {}"}}"#, e)),
+        Err(e) => {
+            // Escape the error message to produce valid JSON
+            let escaped_error = e.to_string()
+                .replace('\\', "\\\\")
+                .replace('"', "\\\"")
+                .replace('\n', "\\n")
+                .replace('\r', "\\r")
+                .replace('\t', "\\t");
+            return RawJson(format!(r#"{{"error": "Failed to generate projects: {}"}}"#, escaped_error));
+        }
     };
 
     // Store in database
@@ -241,6 +250,14 @@ pub async fn get_take_home(
             }
         }
         Ok(None) => RawJson(r#"{"error": "Candidate not linked to this job"}"#.to_string()),
-        Err(e) => RawJson(format!(r#"{{"error": "Database error: {}"}}"#, e)),
+        Err(e) => {
+            let escaped_error = e.to_string()
+                .replace('\\', "\\\\")
+                .replace('"', "\\\"")
+                .replace('\n', "\\n")
+                .replace('\r', "\\r")
+                .replace('\t', "\\t");
+            RawJson(format!(r#"{{"error": "Database error: {}"}}"#, escaped_error))
+        }
     }
 }

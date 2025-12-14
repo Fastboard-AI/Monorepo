@@ -253,6 +253,41 @@ export interface LinkCandidateInput {
   team_compatibility_score?: number;
 }
 
+// Take-home project types (matches backend TakeHomeProjects)
+export interface EvaluationCriterion {
+  criterion: string;
+  weight: number;
+  description: string;
+}
+
+export interface TakeHomeProject {
+  id: string;
+  title: string;
+  description: string;
+  skill_focus: string[];
+  requirements: string[];
+  deliverables: string[];
+  evaluation_criteria: EvaluationCriterion[];
+  time_estimate_hours: number;
+  difficulty: string;
+  skill_gaps_addressed: string[];
+  based_on_repos: string[];
+}
+
+export interface AnalysisSummary {
+  repos_analyzed: number;
+  readmes_found: number;
+  primary_languages: string[];
+  skill_match_percentage: number;
+  identified_gaps: string[];
+}
+
+export interface TakeHomeProjects {
+  projects: TakeHomeProject[];
+  analysis_summary: AnalysisSummary;
+  generated_at?: string;
+}
+
 export const api = {
   // Jobs
   getJobs: (): Promise<ApiJob[]> =>
@@ -384,6 +419,21 @@ export const api = {
     }
     return response.json();
   },
+
+  // Take-home projects
+  generateTakeHomeProjects: (
+    jobId: string,
+    candidateId: string,
+    forceRegenerate?: boolean
+  ): Promise<TakeHomeProjects> =>
+    fetchJson(`${API_BASE}/api/jobs/${jobId}/candidates/${candidateId}/take-home-projects`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ force_regenerate: forceRegenerate }),
+    }),
+
+  getTakeHomeProjects: (jobId: string, candidateId: string): Promise<TakeHomeProjects> =>
+    fetchJson(`${API_BASE}/api/jobs/${jobId}/candidates/${candidateId}/take-home-projects`),
 };
 
 // Resume parsing types

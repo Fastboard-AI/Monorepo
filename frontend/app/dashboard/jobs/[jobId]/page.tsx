@@ -13,6 +13,10 @@ import {
   Trash2,
   GitCompare,
   FileText,
+  FileCode,
+  Loader2,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
 
 import { Header } from "../../../components/Header";
@@ -25,7 +29,7 @@ import { DeleteConfirmModal } from "../../../components/DeleteConfirmModal";
 import { JobTeamPanel } from "../../../components/JobTeamPanel";
 import { useJobs } from "../../../hooks/useJobs";
 import { useTeams } from "../../../hooks/useTeams";
-import { api, JobCandidateResponse } from "../../../lib/api";
+import { api, JobCandidateResponse, TakeHomeProjects } from "../../../lib/api";
 import type { Candidate, Job, Team, ExperienceLevel, JobStatus, JobSkill } from "../../../types";
 import { getSkillName } from "../../../types";
 
@@ -84,6 +88,11 @@ export default function JobDetailPage() {
   // Candidates state
   const [jobCandidates, setJobCandidates] = useState<Candidate[]>([]);
   const [candidatesLoading, setCandidatesLoading] = useState(false);
+
+  // Take-home projects state
+  const [takeHomeProjects, setTakeHomeProjects] = useState<Record<string, TakeHomeProjects>>({});
+  const [generatingTakeHome, setGeneratingTakeHome] = useState<Set<string>>(new Set());
+  const [expandedTakeHome, setExpandedTakeHome] = useState<Set<string>>(new Set());
 
   // Fetch candidates from API
   useEffect(() => {
@@ -216,6 +225,39 @@ export default function JobDetailPage() {
     },
     [jobId]
   );
+
+  // Take-home project handlers
+  const handleGenerateTakeHome = useCallback(
+    async (candidateId: string) => {
+      setGeneratingTakeHome((prev) => new Set(prev).add(candidateId));
+      try {
+        const projects = await api.generateTakeHomeProjects(jobId, candidateId);
+        setTakeHomeProjects((prev) => ({ ...prev, [candidateId]: projects }));
+        setExpandedTakeHome((prev) => new Set(prev).add(candidateId));
+      } catch (error) {
+        console.error("Failed to generate take-home projects:", error);
+      } finally {
+        setGeneratingTakeHome((prev) => {
+          const next = new Set(prev);
+          next.delete(candidateId);
+          return next;
+        });
+      }
+    },
+    [jobId]
+  );
+
+  const toggleTakeHomeExpand = useCallback((candidateId: string) => {
+    setExpandedTakeHome((prev) => {
+      const next = new Set(prev);
+      if (next.has(candidateId)) {
+        next.delete(candidateId);
+      } else {
+        next.add(candidateId);
+      }
+      return next;
+    });
+  }, []);
 
   // Team handlers
   const handleSelectTeam = useCallback(
@@ -412,31 +454,139 @@ export default function JobDetailPage() {
           </div>
         ) : (
           <div className="space-y-4">
-            {jobCandidates.map((candidate) => (
-              <div key={candidate.id} className="relative">
-                <SelectableCandidateCard
-                  candidate={candidate}
-                  isSelected={selectedIds.has(candidate.id)}
-                  onToggleSelect={handleToggleSelect}
-                  onCompare={handleAddToComparison}
-                  onClick={() => {
-                    setSelectedCandidate(candidate);
-                    setIsDetailModalOpen(true);
-                  }}
-                  isInComparison={comparisonCandidates.some(
-                    (c) => c.id === candidate.id
+            {jobCandidates.map((candidate) => {
+              const isGenerating = generatingTakeHome.has(candidate.id);
+              const projects = takeHomeProjects[candidate.id];
+              const isExpanded = expandedTakeHome.has(candidate.id);
+
+              return (
+              <div key={candidate.id} className="relative rounded-xl border border-slate-200 bg-white overflow-hidden">
+                <div className="relative">
+                  <SelectableCandidateCard
+                    candidate={candidate}
+                    isSelected={selectedIds.has(candidate.id)}
+                    onToggleSelect={handleToggleSelect}
+                    onCompare={handleAddToComparison}
+                    onClick={() => {
+                      setSelectedCandidate(candidate);
+                      setIsDetailModalOpen(true);
+                    }}
+                    isInComparison={comparisonCandidates.some(
+                      (c) => c.id === candidate.id
+                    )}
+                    comparisonDisabled={comparisonCandidates.length >= 3}
+                  />
+                  <button
+                    onClick={() => handleRemoveCandidate(candidate.id)}
+                    className="absolute right-4 top-4 rounded-lg p-2 text-slate-400 opacity-0 transition-all hover:bg-red-50 hover:text-red-600 group-hover:opacity-100 sm:opacity-100"
+                    title="Remove from job"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                </div>
+
+                {/* Take-Home Projects Section */}
+                <div className="border-t border-slate-100 px-4 py-3 bg-slate-50">
+                  {!projects || !projects.projects ? (
+                    <button
+                      onClick={() => handleGenerateTakeHome(candidate.id)}
+                      disabled={isGenerating}
+                      className="flex items-center gap-2 rounded-lg bg-violet-600 px-4 py-2 text-sm font-medium text-white hover:bg-violet-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {isGenerating ? (
+                        <>
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          Generating Take-Home Project...
+                        </>
+                      ) : (
+                        <>
+                          <FileCode className="h-4 w-4" />
+                          Generate Take-Home Project
+                        </>
+                      )}
+                    </button>
+                  ) : (
+                    <div>
+                      <button
+                        onClick={() => toggleTakeHomeExpand(candidate.id)}
+                        className="flex items-center gap-2 w-full text-left"
+                      >
+                        <FileCode className="h-4 w-4 text-violet-600" />
+                        <span className="text-sm font-semibold text-slate-900">
+                          Take-Home Projects
+                        </span>
+                        <span className="rounded-full bg-violet-100 px-2 py-0.5 text-xs font-medium text-violet-700">
+                          {projects.projects.length} project{projects.projects.length !== 1 ? "s" : ""}
+                        </span>
+                        {isExpanded ? (
+                          <ChevronUp className="h-4 w-4 text-slate-400 ml-auto" />
+                        ) : (
+                          <ChevronDown className="h-4 w-4 text-slate-400 ml-auto" />
+                        )}
+                      </button>
+
+                      {isExpanded && (
+                        <div className="mt-3 space-y-3">
+                          {projects.analysis_summary?.identified_gaps?.length > 0 && (
+                            <p className="text-xs text-slate-500 italic">
+                              Skill gaps to assess: {projects.analysis_summary.identified_gaps.join(", ")}
+                            </p>
+                          )}
+                          {projects.projects.map((project, idx) => (
+                            <div
+                              key={project.id || idx}
+                              className="rounded-lg bg-white p-3 border border-slate-200"
+                            >
+                              <div className="flex items-start justify-between gap-2">
+                                <h4 className="text-sm font-semibold text-slate-900">
+                                  {project.title}
+                                </h4>
+                                <div className="flex items-center gap-2 flex-shrink-0">
+                                  <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+                                    project.difficulty === "easy"
+                                      ? "bg-green-100 text-green-700"
+                                      : project.difficulty === "medium"
+                                      ? "bg-amber-100 text-amber-700"
+                                      : "bg-red-100 text-red-700"
+                                  }`}>
+                                    {project.difficulty}
+                                  </span>
+                                  <span className="flex items-center gap-1 text-xs text-slate-500">
+                                    <Clock className="h-3 w-3" />
+                                    {project.time_estimate_hours}h
+                                  </span>
+                                </div>
+                              </div>
+                              <p className="mt-1 text-xs text-slate-600">
+                                {project.description}
+                              </p>
+                              {project.skill_gaps_addressed?.length > 0 && (
+                                <p className="mt-2 text-xs text-violet-600 italic">
+                                  Tests: {project.skill_gaps_addressed.join(", ")}
+                                </p>
+                              )}
+                              {project.requirements?.length > 0 && (
+                                <div className="mt-2">
+                                  <p className="text-xs font-medium text-slate-500 mb-1">Requirements:</p>
+                                  <ul className="list-disc list-inside text-xs text-slate-600 space-y-0.5">
+                                    {project.requirements.slice(0, 4).map((req, i) => (
+                                      <li key={i}>{req}</li>
+                                    ))}
+                                    {project.requirements.length > 4 && (
+                                      <li className="text-slate-400">+{project.requirements.length - 4} more</li>
+                                    )}
+                                  </ul>
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                   )}
-                  comparisonDisabled={comparisonCandidates.length >= 3}
-                />
-                <button
-                  onClick={() => handleRemoveCandidate(candidate.id)}
-                  className="absolute right-4 top-4 rounded-lg p-2 text-slate-400 opacity-0 transition-all hover:bg-red-50 hover:text-red-600 group-hover:opacity-100 sm:opacity-100"
-                  title="Remove from job"
-                >
-                  <Trash2 className="h-4 w-4" />
-                </button>
+                </div>
               </div>
-            ))}
+            )})}
           </div>
         )}
       </main>

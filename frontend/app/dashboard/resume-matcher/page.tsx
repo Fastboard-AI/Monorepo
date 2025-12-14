@@ -2,8 +2,6 @@
 
 import { useState, useCallback } from "react";
 import {
-  Briefcase,
-  Users,
   Sparkles,
   ChevronRight,
   Loader2,
@@ -32,10 +30,12 @@ import { getSkillName } from "../../types";
 
 interface ParsedResult {
   candidate: Candidate;
+  candidateId: string; // Actual database ID after creation
   jobScore: number;
   teamScore: number;
   parsed: ParsedResume;
   fileName: string;
+  analysisStatus?: string;
 }
 
 function calculateScores(
@@ -158,7 +158,7 @@ export default function ResumeMatcherPage() {
         const { jobScore, teamScore } = calculateScores(parsed, selectedJob, teamMembers);
         const candidate = parsedToCandidate(parsed, file.name, jobScore, teamScore);
 
-        results.push({ candidate, jobScore, teamScore, parsed, fileName: file.name });
+        results.push({ candidate, candidateId: "", jobScore, teamScore, parsed, fileName: file.name });
       } catch (error) {
         errorMessages.push(`${file.name}: ${error instanceof Error ? error.message : "Unknown error"}`);
       }
@@ -173,7 +173,9 @@ export default function ResumeMatcherPage() {
 
     // Save all candidates to database
     setProcessingStatus("Saving candidates to database...");
-    for (const { candidate, jobScore, teamScore } of results) {
+    for (let i = 0; i < results.length; i++) {
+      const result = results[i];
+      const { candidate, jobScore, teamScore, parsed } = result;
       try {
         const createdCandidate = await api.createCandidate({
           name: candidate.name,
@@ -204,6 +206,11 @@ export default function ResumeMatcherPage() {
           resume_file_name: candidate.resumeFileName,
           source: "resume_matcher",
         });
+
+        // Store the actual database ID
+        results[i].candidateId = createdCandidate.id;
+        // Track analysis status (GitHub analysis runs automatically if link present)
+        results[i].analysisStatus = parsed.github_url ? "analyzing" : undefined;
 
         await api.addCandidateToJob(selectedJob.id, {
           candidate_id: createdCandidate.id,
@@ -393,7 +400,9 @@ export default function ResumeMatcherPage() {
                 </div>
               ) : (
                 <div className="space-y-4">
-                  {matchedResults.map(({ candidate, jobScore, teamScore, parsed }) => (
+                  {matchedResults.map((result) => {
+                    const { candidate, jobScore, teamScore, parsed, analysisStatus } = result;
+                    return (
                     <div key={candidate.id} className="rounded-xl border border-slate-200 p-4">
                       <MatchedCandidateCard
                         candidate={candidate}
@@ -402,22 +411,30 @@ export default function ResumeMatcherPage() {
                         onViewDetails={() => setSelectedCandidate(candidate)}
                       />
 
-                      {/* Extracted Links */}
+                      {/* Extracted Links & GitHub Analysis Status */}
                       {(parsed.github_url || parsed.linkedin_url || parsed.website_url) && (
                         <div className="mt-4 pt-4 border-t border-slate-100">
                           <p className="text-xs font-medium text-slate-500 mb-2">Extracted Links</p>
                           <div className="flex flex-wrap gap-2">
                             {parsed.github_url && (
-                              <a
-                                href={parsed.github_url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="flex items-center gap-1.5 rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-slate-800"
-                              >
-                                <Github className="h-3.5 w-3.5" />
-                                GitHub
-                                <ExternalLink className="h-3 w-3" />
-                              </a>
+                              <div className="flex items-center gap-2">
+                                <a
+                                  href={parsed.github_url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="flex items-center gap-1.5 rounded-lg bg-slate-900 px-3 py-1.5 text-xs font-medium text-white hover:bg-slate-800"
+                                >
+                                  <Github className="h-3.5 w-3.5" />
+                                  GitHub
+                                  <ExternalLink className="h-3 w-3" />
+                                </a>
+                                {analysisStatus === "analyzing" && (
+                                  <span className="flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-700">
+                                    <Loader2 className="h-3 w-3 animate-spin" />
+                                    Analyzing...
+                                  </span>
+                                )}
+                              </div>
                             )}
                             {parsed.linkedin_url && (
                               <a
@@ -447,7 +464,7 @@ export default function ResumeMatcherPage() {
                         </div>
                       )}
                     </div>
-                  ))}
+                  )})}
                 </div>
               )}
             </section>

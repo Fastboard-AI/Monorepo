@@ -448,6 +448,30 @@ Parse resume from raw text (alternative to file upload).
 
 ---
 
+### Resume Matcher Workflow
+
+The Resume Matcher on the frontend provides an integrated workflow:
+
+1. **Parse Resume:** Upload PDF/DOCX → AI extracts candidate info + links
+2. **Create Candidate:** Automatically saves to database with scores
+3. **Auto GitHub Analysis:** If GitHub URL found in resume, deep analysis runs automatically in background
+
+Take-home project generation is available on the Job Detail page (`/dashboard/jobs/[jobId]`) for each candidate.
+
+**Automatic GitHub Analysis:**
+When creating a candidate with a GitHub link (via `POST /api/candidates`), the backend:
+1. Extracts the GitHub username
+2. Sets `analysis_status = "analyzing"`
+3. Spawns background task calling `analyze_github_user_deep()`
+4. Updates candidate record with:
+   - `code_characteristics` - Coding style metrics
+   - `github_stats` - Repository analysis
+   - `developer_profile` - AI personality summary
+   - `ai_detection_score`, `ai_proficiency_score`, `code_authenticity_score`
+5. Sets `analysis_status = "completed"`
+
+---
+
 #### POST /api/candidates
 Create a new candidate (used by AI Sourcing & Resume Matcher).
 
