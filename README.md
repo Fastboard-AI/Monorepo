@@ -5,9 +5,10 @@ AI-powered talent matching platform with team compatibility analysis.
 ## Architecture
 
 ```
-├── backend/     # Rust API (Rocket + PostgreSQL + Gemini AI)
-├── frontend/    # Next.js 16 (React 19 + Tailwind + Clerk Auth)
-├── scraping/    # Python scraping service (FastAPI + Playwright)
+├── backend/       # Rust API (Rocket + PostgreSQL + Gemini AI)
+├── frontend/      # Next.js 16 (React 19 + Tailwind + Clerk Auth)
+├── scraping/      # LinkedIn scraping (FastAPI + Playwright)
+├── web_scraping/  # General web scraping (FastAPI + Crawl4AI)
 └── docker-compose.yml
 ```
 
@@ -54,6 +55,7 @@ docker compose up -d --build
 Services:
 - **Frontend**: http://localhost:3000
 - **Backend**: http://localhost:8000
+- **Web Scraping**: http://localhost:8002
 
 ### 4. Stop Services
 
@@ -88,7 +90,7 @@ pnpm dev
 
 App runs at http://localhost:3000
 
-### Scraping Service
+### Scraping Service (LinkedIn)
 
 ```bash
 cd scraping
@@ -103,6 +105,18 @@ uv run python -m scraping.main --with-browser
 ```
 
 Service runs at http://localhost:8001
+
+### Web Scraping Service (Crawl4AI)
+
+```bash
+cd web_scraping
+uv sync
+uv run playwright install
+
+uv run uvicorn web_scraping.main:app --reload --port 8002
+```
+
+Service runs at http://localhost:8002
 
 ---
 
@@ -131,6 +145,19 @@ Service runs at http://localhost:8001
 | POST | `/analyse_repo` | Analyze GitHub repo (clones repo) |
 | POST | `/analyse_github` | Analyze GitHub user (via commits) |
 
+### Web Scraping Service (port 8002)
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/health` | Health check |
+| POST | `/api/developer/extract` | Extract developer profile from URL |
+| POST | `/api/developer/batch` | Extract profiles from multiple URLs |
+| POST | `/api/developer/github` | Extract from GitHub profile |
+| POST | `/api/developer/portfolio` | Extract from portfolio site |
+| POST | `/api/crawl` | Generic URL crawl |
+| POST | `/api/markdown` | Get markdown content |
+| POST | `/api/links` | Extract links from URL |
+
 ---
 
 ## Tech Stack
@@ -147,11 +174,17 @@ Service runs at http://localhost:8001
 - Tailwind CSS 4
 - Clerk Authentication
 
-**Scraping**
+**Scraping (LinkedIn)**
 - Python 3.11
 - FastAPI
 - Playwright
 - DuckDuckGo Search
+
+**Web Scraping (Developer Profiles)**
+- Python 3.10
+- FastAPI
+- Crawl4AI
+- Playwright
 
 ---
 
