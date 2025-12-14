@@ -376,6 +376,16 @@ SCRAPING_SERVICE_URL=http://localhost:8001
 
 ### Candidates
 
+#### GET /api/candidates/count
+Get total count of candidates in the database.
+
+**Response:**
+```json
+{
+  "count": 42
+}
+```
+
 #### POST /api/candidates
 Create a new candidate (used by AI Sourcing & Resume Matcher).
 

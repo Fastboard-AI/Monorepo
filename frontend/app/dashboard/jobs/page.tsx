@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth, RedirectToSignIn } from "@clerk/nextjs";
 import {
@@ -18,6 +18,7 @@ import { CreateJobModal } from "../../components/CreateJobModal";
 import { EditJobModal } from "../../components/EditJobModal";
 import { DeleteConfirmModal } from "../../components/DeleteConfirmModal";
 import { useJobs } from "../../hooks/useJobs";
+import { api } from "../../lib/api";
 import type { Job, ExperienceLevel, JobStatus, JobSkill } from "../../types";
 import { getSkillName } from "../../types";
 
@@ -55,14 +56,18 @@ export default function JobsPage() {
     );
   }, [jobs, searchQuery]);
 
+  // Total candidates count from DB
+  const [totalCandidates, setTotalCandidates] = useState(0);
+
+  useEffect(() => {
+    api.getCandidatesCount()
+      .then((res) => setTotalCandidates(res.count))
+      .catch(() => setTotalCandidates(0));
+  }, []);
+
   // Stats
   const openJobsCount = useMemo(
     () => jobs.filter((j) => j.status === "sourcing" || j.status === "reviewing").length,
-    [jobs]
-  );
-
-  const totalCandidates = useMemo(
-    () => jobs.reduce((sum, j) => sum + j.candidateIds.length, 0),
     [jobs]
   );
 

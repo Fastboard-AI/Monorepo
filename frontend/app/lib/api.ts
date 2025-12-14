@@ -365,4 +365,8 @@ export const api = {
     fetchJson(`${API_BASE}/api/jobs/${jobId}/candidates/${candidateId}`, {
       method: "DELETE",
     }),
+
+  // Candidates count
+  getCandidatesCount: (): Promise<{ count: number }> =>
+    fetchJson(`${API_BASE}/api/candidates/count`),
 };

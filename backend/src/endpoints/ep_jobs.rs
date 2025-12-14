@@ -70,7 +70,12 @@ struct JobRow {
 #[get("/jobs")]
 pub async fn get_jobs(mut db: Connection<MainDatabase>) -> RawJson<String> {
     let rows = sqlx::query(
-        r#"SELECT id, title, description, location, required_skills, experience_level, status, team_id, created_at, updated_at FROM jobs ORDER BY created_at DESC"#
+        r#"SELECT j.id, j.title, j.description, j.location, j.required_skills, j.experience_level, j.status, j.team_id, j.created_at, j.updated_at,
+                  COALESCE(ARRAY_AGG(jc.candidate_id) FILTER (WHERE jc.candidate_id IS NOT NULL), '{}') as candidate_ids
+           FROM jobs j
+           LEFT JOIN job_candidates jc ON j.id = jc.job_id
+           GROUP BY j.id
+           ORDER BY j.created_at DESC"#
     )
     .fetch_all(&mut **db)
     .await
@@ -80,6 +85,7 @@ pub async fn get_jobs(mut db: Connection<MainDatabase>) -> RawJson<String> {
         .into_iter()
         .map(|r| {
             let skills_json: serde_json::Value = r.get("required_skills");
+            let candidate_uuids: Vec<uuid::Uuid> = r.get("candidate_ids");
             JobRow {
                 id: r.get::<uuid::Uuid, _>("id").to_string(),
                 title: r.get("title"),
@@ -89,7 +95,7 @@ pub async fn get_jobs(mut db: Connection<MainDatabase>) -> RawJson<String> {
                 experience_level: r.get::<Option<String>, _>("experience_level").unwrap_or_else(|| "any".to_string()),
                 status: r.get::<Option<String>, _>("status").unwrap_or_else(|| "sourcing".to_string()),
                 team_id: r.get::<Option<uuid::Uuid>, _>("team_id").map(|id| id.to_string()),
-                candidate_ids: vec![],
+                candidate_ids: candidate_uuids.into_iter().map(|id| id.to_string()).collect(),
                 created_at: r.get::<Option<chrono::DateTime<chrono::Utc>>, _>("created_at").map(|t| t.to_string()).unwrap_or_default(),
                 updated_at: r.get::<Option<chrono::DateTime<chrono::Utc>>, _>("updated_at").map(|t| t.to_string()).unwrap_or_default(),
             }
@@ -104,7 +110,12 @@ pub async fn get_job(id: &str, mut db: Connection<MainDatabase>) -> RawJson<Stri
     let uuid = uuid::Uuid::parse_str(id).unwrap();
 
     let row = sqlx::query(
-        r#"SELECT id, title, description, location, required_skills, experience_level, status, team_id, created_at, updated_at FROM jobs WHERE id = $1"#
+        r#"SELECT j.id, j.title, j.description, j.location, j.required_skills, j.experience_level, j.status, j.team_id, j.created_at, j.updated_at,
+                  COALESCE(ARRAY_AGG(jc.candidate_id) FILTER (WHERE jc.candidate_id IS NOT NULL), '{}') as candidate_ids
+           FROM jobs j
+           LEFT JOIN job_candidates jc ON j.id = jc.job_id
+           WHERE j.id = $1
+           GROUP BY j.id"#
     )
     .bind(uuid)
     .fetch_one(&mut **db)
@@ -112,6 +123,7 @@ pub async fn get_job(id: &str, mut db: Connection<MainDatabase>) -> RawJson<Stri
     .unwrap();
 
     let skills_json: serde_json::Value = row.get("required_skills");
+    let candidate_uuids: Vec<uuid::Uuid> = row.get("candidate_ids");
     let job = JobRow {
         id: row.get::<uuid::Uuid, _>("id").to_string(),
         title: row.get("title"),
@@ -121,7 +133,7 @@ pub async fn get_job(id: &str, mut db: Connection<MainDatabase>) -> RawJson<Stri
         experience_level: row.get::<Option<String>, _>("experience_level").unwrap_or_else(|| "any".to_string()),
         status: row.get::<Option<String>, _>("status").unwrap_or_else(|| "sourcing".to_string()),
         team_id: row.get::<Option<uuid::Uuid>, _>("team_id").map(|id| id.to_string()),
-        candidate_ids: vec![],
+        candidate_ids: candidate_uuids.into_iter().map(|id| id.to_string()).collect(),
         created_at: row.get::<Option<chrono::DateTime<chrono::Utc>>, _>("created_at").map(|t| t.to_string()).unwrap_or_default(),
         updated_at: row.get::<Option<chrono::DateTime<chrono::Utc>>, _>("updated_at").map(|t| t.to_string()).unwrap_or_default(),
     };

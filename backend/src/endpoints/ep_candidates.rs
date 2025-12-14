@@ -361,6 +361,17 @@ pub async fn get_job_candidates(job_id: &str, mut db: Connection<MainDatabase>) 
     RawJson(serde_json::to_string(&job_candidates).unwrap())
 }
 
+#[get("/candidates/count")]
+pub async fn get_candidates_count(mut db: Connection<MainDatabase>) -> RawJson<String> {
+    let row = sqlx::query("SELECT COUNT(*) as count FROM sourced_candidates")
+        .fetch_one(&mut **db)
+        .await
+        .unwrap();
+
+    let count: i64 = row.get("count");
+    RawJson(format!(r#"{{"count":{}}}"#, count))
+}
+
 #[allow(unused_variables)]
 #[delete("/jobs/<job_id>/candidates/<candidate_id>")]
 pub async fn remove_candidate_from_job(job_id: &str, candidate_id: &str, mut db: Connection<MainDatabase>) -> RawJson<String> {

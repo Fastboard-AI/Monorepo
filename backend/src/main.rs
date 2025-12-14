@@ -41,6 +41,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
             endpoints::search_candidates,
             // Candidates
             endpoints::create_candidate,
+            endpoints::get_candidates_count,
             endpoints::add_candidate_to_job,
             endpoints::get_job_candidates,
             endpoints::remove_candidate_from_job,
