@@ -54,6 +54,21 @@ export interface ApiTeamMember {
     collaboration: string;
     pace: string;
   };
+  github?: string;
+  linkedin?: string;
+  website?: string;
+  code_characteristics?: {
+    avg_lines_per_function: number;
+    functional_vs_oop_ratio: number;
+    recursion_vs_loop_ratio: number;
+    dependency_coupling_index: number;
+    modularity_index_score: number;
+    avg_nesting_depth: number;
+    abstraction_layer_count: number;
+    immutability_score: number;
+    error_handling_centralization_score: number;
+    test_structure_modularity_ratio: number;
+  };
 }
 
 export interface ApiTeam {
@@ -87,6 +102,24 @@ export interface CreateTeamMemberInput {
     collaboration: string;
     pace: string;
   };
+  github?: string;
+  linkedin?: string;
+  website?: string;
+}
+
+export interface UpdateTeamMemberInput {
+  name?: string;
+  role?: string;
+  skills?: { name: string; level: string }[];
+  experience_level?: string;
+  work_style?: {
+    communication: string;
+    collaboration: string;
+    pace: string;
+  };
+  github?: string;
+  linkedin?: string;
+  website?: string;
 }
 
 // Sourcing API
@@ -247,6 +280,17 @@ export const api = {
   addTeamMember: (teamId: string, data: CreateTeamMemberInput): Promise<ApiTeamMember> =>
     fetchJson(`${API_BASE}/api/teams/${teamId}/members`, {
       method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data),
+    }),
+
+  updateTeamMember: (
+    teamId: string,
+    memberId: string,
+    data: UpdateTeamMemberInput
+  ): Promise<ApiTeamMember> =>
+    fetchJson(`${API_BASE}/api/teams/${teamId}/members/${memberId}`, {
+      method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(data),
     }),

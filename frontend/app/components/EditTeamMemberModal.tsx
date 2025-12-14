@@ -1,14 +1,15 @@
 "use client";
 
-import { useState } from "react";
-import { X, UserPlus, Plus, Trash2 } from "lucide-react";
+import { useState, useEffect } from "react";
+import { X, UserCog, Plus, RefreshCw } from "lucide-react";
 import type { Team, TeamMember, Skill, ExperienceLevel, WorkStyle } from "../types";
 
-interface AddTeamMemberModalProps {
+interface EditTeamMemberModalProps {
   team: Team | null;
+  member: TeamMember | null;
   isOpen: boolean;
   onClose: () => void;
-  onAddMember: (member: Omit<TeamMember, "id">) => void;
+  onUpdateMember: (memberId: string, updates: Partial<Omit<TeamMember, "id">>) => Promise<void>;
 }
 
 const EXPERIENCE_LEVELS: { value: ExperienceLevel; label: string }[] = [
@@ -20,12 +21,13 @@ const EXPERIENCE_LEVELS: { value: ExperienceLevel; label: string }[] = [
 
 const SKILL_LEVELS: Skill["level"][] = ["beginner", "intermediate", "advanced", "expert"];
 
-export function AddTeamMemberModal({
+export function EditTeamMemberModal({
   team,
+  member,
   isOpen,
   onClose,
-  onAddMember,
-}: AddTeamMemberModalProps) {
+  onUpdateMember,
+}: EditTeamMemberModalProps) {
   const [name, setName] = useState("");
   const [role, setRole] = useState("");
   const [experienceLevel, setExperienceLevel] = useState<ExperienceLevel>("mid");
@@ -40,8 +42,23 @@ export function AddTeamMemberModal({
   const [github, setGithub] = useState("");
   const [linkedin, setLinkedin] = useState("");
   const [website, setWebsite] = useState("");
+  const [isSaving, setIsSaving] = useState(false);
 
-  if (!isOpen || !team) return null;
+  // Populate form when member changes
+  useEffect(() => {
+    if (member) {
+      setName(member.name);
+      setRole(member.role);
+      setExperienceLevel(member.experienceLevel);
+      setSkills([...member.skills]);
+      setWorkStyle({ ...member.workStyle });
+      setGithub(member.github || "");
+      setLinkedin(member.linkedin || "");
+      setWebsite(member.website || "");
+    }
+  }, [member]);
+
+  if (!isOpen || !team || !member) return null;
 
   const handleAddSkill = () => {
     if (!newSkillName.trim()) return;
@@ -59,66 +76,56 @@ export function AddTeamMemberModal({
     setSkills((prev) => prev.filter((s) => s.name !== skillName));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim() || !role.trim()) return;
 
-    onAddMember({
-      name: name.trim(),
-      role: role.trim(),
-      skills,
-      experienceLevel,
-      workStyle,
-      github: github.trim() || undefined,
-      linkedin: linkedin.trim() || undefined,
-      website: website.trim() || undefined,
-    });
-
-    handleClose();
+    setIsSaving(true);
+    try {
+      await onUpdateMember(member.id, {
+        name: name.trim(),
+        role: role.trim(),
+        skills,
+        experienceLevel,
+        workStyle,
+        github: github.trim() || undefined,
+        linkedin: linkedin.trim() || undefined,
+        website: website.trim() || undefined,
+      });
+      onClose();
+    } catch (error) {
+      console.error("Failed to update member:", error);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
-  const handleClose = () => {
-    setName("");
-    setRole("");
-    setExperienceLevel("mid");
-    setSkills([]);
-    setNewSkillName("");
-    setNewSkillLevel("intermediate");
-    setWorkStyle({
-      communication: "mixed",
-      collaboration: "balanced",
-      pace: "flexible",
-    });
-    setGithub("");
-    setLinkedin("");
-    setWebsite("");
-    onClose();
-  };
+  const githubChanged = (member.github || "") !== github.trim();
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div
         className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm"
-        onClick={handleClose}
+        onClick={onClose}
       />
       <div className="relative max-h-[90vh] w-full max-w-lg overflow-hidden rounded-2xl bg-white shadow-2xl flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between border-b border-slate-100 p-6">
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-500 to-violet-500">
-              <UserPlus className="h-5 w-5 text-white" />
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-amber-500 to-orange-500">
+              <UserCog className="h-5 w-5 text-white" />
             </div>
             <div>
               <h2 className="text-lg font-semibold text-slate-900">
-                Add Team Member
+                Edit Team Member
               </h2>
               <p className="text-sm text-slate-500">
-                Add an existing employee to {team.name}
+                Update {member.name}&apos;s details
               </p>
             </div>
           </div>
           <button
-            onClick={handleClose}
+            onClick={onClose}
             className="rounded-lg p-2 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600"
           >
             <X className="h-5 w-5" />
@@ -139,7 +146,6 @@ export function AddTeamMemberModal({
               onChange={(e) => setName(e.target.value)}
               placeholder="e.g., Sarah Chen"
               className="mt-1.5 w-full rounded-lg border border-slate-200 px-4 py-2.5 text-slate-900 placeholder:text-slate-400 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
-              autoFocus
             />
           </div>
 
@@ -310,13 +316,19 @@ export function AddTeamMemberModal({
           <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 space-y-4">
             <div>
               <h3 className="text-sm font-medium text-slate-700">Developer Links</h3>
-              <p className="text-xs text-slate-500 mt-0.5">Optional - Code style will be analyzed if GitHub is provided</p>
+              <p className="text-xs text-slate-500 mt-0.5">Code style will be re-analyzed if GitHub changes</p>
             </div>
 
             {/* GitHub */}
             <div>
               <label htmlFor="github" className="block text-xs font-medium text-slate-600">
                 GitHub Username
+                {githubChanged && github.trim() && (
+                  <span className="ml-2 inline-flex items-center gap-1 text-amber-600">
+                    <RefreshCw className="h-3 w-3" />
+                    Will re-analyze
+                  </span>
+                )}
               </label>
               <input
                 id="github"
@@ -363,18 +375,27 @@ export function AddTeamMemberModal({
           <div className="flex justify-end gap-3 pt-2">
             <button
               type="button"
-              onClick={handleClose}
+              onClick={onClose}
               className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50"
             >
               Cancel
             </button>
             <button
               type="submit"
-              disabled={!name.trim() || !role.trim()}
+              disabled={!name.trim() || !role.trim() || isSaving}
               className="btn-lift flex items-center gap-2 rounded-lg gradient-bg px-4 py-2 text-sm font-medium text-white shadow-button disabled:cursor-not-allowed disabled:opacity-50"
             >
-              <UserPlus className="h-4 w-4" />
-              Add Member
+              {isSaving ? (
+                <>
+                  <RefreshCw className="h-4 w-4 animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                <>
+                  <UserCog className="h-4 w-4" />
+                  Save Changes
+                </>
+              )}
             </button>
           </div>
         </form>

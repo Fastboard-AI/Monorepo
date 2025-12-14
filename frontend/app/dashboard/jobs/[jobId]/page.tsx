@@ -74,6 +74,7 @@ export default function JobDetailPage() {
     teams,
     isLoading: teamsLoading,
     getTeamById,
+    updateTeamMember,
   } = useTeams();
 
   const job = getJobById(jobId);
@@ -360,6 +361,7 @@ export default function JobDetailPage() {
             isLoadingTeams={teamsLoading}
             onSelectTeam={handleSelectTeam}
             onUnlinkTeam={handleUnlinkTeam}
+            onUpdateTeamMember={updateTeamMember}
           />
         </div>
 

@@ -24,8 +24,18 @@ CREATE TABLE IF NOT EXISTS team_members (
   skills JSONB DEFAULT '[]',
   experience_level VARCHAR DEFAULT 'mid',
   work_style JSONB DEFAULT '{"communication":"mixed","collaboration":"balanced","pace":"steady"}',
+  github VARCHAR,
+  linkedin VARCHAR,
+  website VARCHAR,
+  code_characteristics JSONB DEFAULT NULL,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+-- Migration: Add developer links to existing team_members table
+-- ALTER TABLE team_members ADD COLUMN IF NOT EXISTS github VARCHAR;
+-- ALTER TABLE team_members ADD COLUMN IF NOT EXISTS linkedin VARCHAR;
+-- ALTER TABLE team_members ADD COLUMN IF NOT EXISTS website VARCHAR;
+-- ALTER TABLE team_members ADD COLUMN IF NOT EXISTS code_characteristics JSONB DEFAULT NULL;
 
 -- ============================================
 -- Jobs table

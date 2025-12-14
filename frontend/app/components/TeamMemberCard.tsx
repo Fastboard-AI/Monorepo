@@ -1,10 +1,11 @@
 "use client";
 
-import { X, Pencil } from "lucide-react";
+import { X, Pencil, BarChart3 } from "lucide-react";
 import type { TeamMember } from "../types";
 
 interface TeamMemberCardProps {
   member: TeamMember;
+  onClick?: () => void;
   onRemove?: () => void;
   onEdit?: () => void;
   compact?: boolean;
@@ -19,6 +20,7 @@ const EXPERIENCE_LABELS: Record<string, string> = {
 
 export function TeamMemberCard({
   member,
+  onClick,
   onRemove,
   onEdit,
   compact = false,
@@ -32,7 +34,10 @@ export function TeamMemberCard({
 
   if (compact) {
     return (
-      <div className="group flex items-center gap-2 rounded-lg border border-slate-100 bg-slate-50 py-1.5 pl-1.5 pr-2 transition-colors hover:bg-slate-100">
+      <div
+        onClick={onClick}
+        className={`group flex items-center gap-2 rounded-lg border border-slate-100 bg-slate-50 py-1.5 pl-1.5 pr-2 transition-colors hover:bg-slate-100 ${onClick ? "cursor-pointer" : ""}`}
+      >
         <div className="flex h-7 w-7 items-center justify-center rounded-md bg-gradient-to-br from-indigo-400 to-violet-400 text-xs font-medium text-white">
           {initials}
         </div>
@@ -41,9 +46,14 @@ export function TeamMemberCard({
             {member.name.split(" ")[0]}
           </span>
         </div>
+        {member.codeCharacteristics && (
+          <span title="Code analyzed">
+            <BarChart3 className="h-3 w-3 text-indigo-400" />
+          </span>
+        )}
         {onRemove && (
           <button
-            onClick={onRemove}
+            onClick={(e) => { e.stopPropagation(); onRemove(); }}
             className="rounded p-0.5 text-slate-400 opacity-0 transition-opacity hover:bg-red-100 hover:text-red-600 group-hover:opacity-100"
             title="Remove from team"
           >
@@ -55,11 +65,19 @@ export function TeamMemberCard({
   }
 
   return (
-    <div className="group rounded-xl border border-slate-100 bg-white p-4 transition-all hover:border-slate-200 hover:shadow-sm">
+    <div
+      onClick={onClick}
+      className={`group rounded-xl border border-slate-100 bg-white p-4 transition-all hover:border-slate-200 hover:shadow-sm ${onClick ? "cursor-pointer" : ""}`}
+    >
       <div className="flex items-start gap-3">
         {/* Avatar */}
-        <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-400 to-violet-400 text-sm font-semibold text-white">
+        <div className="relative flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-400 to-violet-400 text-sm font-semibold text-white">
           {initials}
+          {member.codeCharacteristics && (
+            <div className="absolute -bottom-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-indigo-100 ring-2 ring-white">
+              <BarChart3 className="h-2.5 w-2.5 text-indigo-600" />
+            </div>
+          )}
         </div>
 
         {/* Info */}
@@ -69,7 +87,7 @@ export function TeamMemberCard({
             <div className="flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
               {onEdit && (
                 <button
-                  onClick={onEdit}
+                  onClick={(e) => { e.stopPropagation(); onEdit(); }}
                   className="rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
                   title="Edit member"
                 >
@@ -78,7 +96,7 @@ export function TeamMemberCard({
               )}
               {onRemove && (
                 <button
-                  onClick={onRemove}
+                  onClick={(e) => { e.stopPropagation(); onRemove(); }}
                   className="rounded p-1 text-slate-400 hover:bg-red-100 hover:text-red-600"
                   title="Remove from team"
                 >

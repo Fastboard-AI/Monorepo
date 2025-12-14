@@ -24,6 +24,7 @@ export default function TeamsPage() {
     deleteTeam,
     addTeamMember,
     removeTeamMember,
+    updateTeamMember,
   } = useTeams();
 
   // Modal states
@@ -301,6 +302,7 @@ export default function TeamsPage() {
         }}
         onRemoveMember={handleRemoveMember}
         onAddMember={handleAddMemberClick}
+        onUpdateMember={updateTeamMember}
       />
 
       <DeleteConfirmModal

@@ -20,6 +20,10 @@ function apiToTeamMember(apiMember: ApiTeamMember): TeamMember {
       collaboration: apiMember.work_style.collaboration as WorkStyle["collaboration"],
       pace: apiMember.work_style.pace as WorkStyle["pace"],
     },
+    github: apiMember.github,
+    linkedin: apiMember.linkedin,
+    website: apiMember.website,
+    codeCharacteristics: apiMember.code_characteristics,
   };
 }
 
@@ -79,6 +83,9 @@ export function useTeams() {
               collaboration: member.workStyle.collaboration,
               pace: member.workStyle.pace,
             },
+            github: member.github,
+            linkedin: member.linkedin,
+            website: member.website,
           });
         }
         // Refresh the team to get members
@@ -129,6 +136,9 @@ export function useTeams() {
           collaboration: memberData.workStyle.collaboration,
           pace: memberData.workStyle.pace,
         },
+        github: memberData.github,
+        linkedin: memberData.linkedin,
+        website: memberData.website,
       });
 
       const newMember = apiToTeamMember(apiMember);
@@ -172,15 +182,30 @@ export function useTeams() {
   );
 
   const updateTeamMember = useCallback(
-    (teamId: string, memberId: string, updates: Partial<Omit<TeamMember, "id">>) => {
-      // Note: This is currently client-side only
-      // TODO: Add backend endpoint for updating team members
+    async (teamId: string, memberId: string, updates: Partial<Omit<TeamMember, "id">>): Promise<TeamMember> => {
+      const apiMember = await api.updateTeamMember(teamId, memberId, {
+        name: updates.name,
+        role: updates.role,
+        skills: updates.skills?.map((s) => ({ name: s.name, level: s.level })),
+        experience_level: updates.experienceLevel,
+        work_style: updates.workStyle ? {
+          communication: updates.workStyle.communication,
+          collaboration: updates.workStyle.collaboration,
+          pace: updates.workStyle.pace,
+        } : undefined,
+        github: updates.github,
+        linkedin: updates.linkedin,
+        website: updates.website,
+      });
+
+      const updatedMember = apiToTeamMember(apiMember);
+
       setTeams((prev) =>
         prev.map((team) => {
           if (team.id !== teamId) return team;
 
           const updatedMembers = team.members.map((m) =>
-            m.id === memberId ? { ...m, ...updates } : m
+            m.id === memberId ? updatedMember : m
           );
           return {
             ...team,
@@ -189,6 +214,8 @@ export function useTeams() {
           };
         })
       );
+
+      return updatedMember;
     },
     []
   );

@@ -137,7 +137,8 @@ Service runs at http://localhost:8002
 | GET | `/api/teams/:id` | Get team |
 | PUT | `/api/teams/:id` | Update team |
 | DELETE | `/api/teams/:id` | Delete team |
-| POST | `/api/teams/:id/members` | Add team member |
+| POST | `/api/teams/:id/members` | Add team member (triggers code analysis if GitHub provided) |
+| PUT | `/api/teams/:id/members/:mid` | Update team member (re-triggers analysis if GitHub changes) |
 | DELETE | `/api/teams/:id/members/:mid` | Remove member |
 | POST | `/api/candidates` | Create candidate |
 | POST | `/api/sourcing/search` | AI candidate sourcing |
@@ -160,6 +161,59 @@ Service runs at http://localhost:8002
 
 ---
 
+## Features
+
+### Team Code Analysis
+
+When adding team members, you can provide their GitHub username, LinkedIn URL, and personal website. If a GitHub username is provided, the system automatically analyzes their code style in the background using Gemini AI.
+
+**Code Characteristics Analyzed:**
+- Function size & complexity
+- OOP vs Functional programming ratio
+- Recursion vs Loop preferences
+- Dependency coupling index
+- Modularity score
+- Nesting depth
+- Abstraction layers
+- Immutability patterns
+- Error handling style
+- Test structure
+
+This data is used to match candidates with compatible coding styles to existing team members.
+
+### Code Style Radar Chart
+
+Team members with analyzed code display a small chart badge on their avatar. Click any team member card to open a detail view showing:
+- Full profile with GitHub, LinkedIn, and website links
+- All skills and experience level
+- Work style preferences
+- Interactive radar chart visualizing all 10 code metrics
+
+From the detail view, click **Edit** to update member details. If you change a team member's GitHub username, code analysis automatically re-runs in the background.
+
+This works in both the **Jobs** section (when viewing a linked team) and the **Teams** management page.
+
+### Team Member Fields
+
+```json
+{
+  "name": "Sarah Chen",
+  "role": "Senior Frontend Developer",
+  "skills": [{ "name": "React", "level": "expert" }],
+  "experience_level": "senior",
+  "work_style": {
+    "communication": "async",
+    "collaboration": "balanced",
+    "pace": "steady"
+  },
+  "github": "sarahchen",
+  "linkedin": "https://linkedin.com/in/sarahchen",
+  "website": "https://sarahchen.dev"
+}
+```
+
+---
+
 ## Tech Stack
 
 **Backend**
@@ -173,6 +227,7 @@ Service runs at http://localhost:8002
 - React 19
 - Tailwind CSS 4
 - Clerk Authentication
+- Recharts (radar charts)
 
 **Scraping (LinkedIn)**
 - Python 3.11

@@ -61,6 +61,20 @@ export interface WorkStyle {
   pace: "fast" | "steady" | "flexible";
 }
 
+// Code characteristics from AI analysis
+export interface CodeCharacteristics {
+  avg_lines_per_function: number;
+  functional_vs_oop_ratio: number;
+  recursion_vs_loop_ratio: number;
+  dependency_coupling_index: number;
+  modularity_index_score: number;
+  avg_nesting_depth: number;
+  abstraction_layer_count: number;
+  immutability_score: number;
+  error_handling_centralization_score: number;
+  test_structure_modularity_ratio: number;
+}
+
 // Team member = existing employee (not a candidate)
 export interface TeamMember {
   id: string;
@@ -69,6 +83,10 @@ export interface TeamMember {
   skills: Skill[];
   experienceLevel: ExperienceLevel;
   workStyle: WorkStyle;
+  github?: string;
+  linkedin?: string;
+  website?: string;
+  codeCharacteristics?: CodeCharacteristics;
 }
 
 export interface Team {

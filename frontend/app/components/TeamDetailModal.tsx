@@ -1,15 +1,12 @@
 "use client";
 
-import { X, Users, UserPlus, Trash2, TrendingUp } from "lucide-react";
-import type { Team } from "../types";
+import { useState } from "react";
+import { X, Users, UserPlus, TrendingUp } from "lucide-react";
+import type { Team, TeamMember } from "../types";
 import { ScoreRing } from "./ScoreRing";
-
-const EXPERIENCE_LABELS: Record<string, string> = {
-  entry: "Entry",
-  mid: "Mid",
-  senior: "Senior",
-  lead: "Lead",
-};
+import { TeamMemberCard } from "./TeamMemberCard";
+import { TeamMemberDetailModal } from "./TeamMemberDetailModal";
+import { EditTeamMemberModal } from "./EditTeamMemberModal";
 
 interface TeamDetailModalProps {
   team: Team | null;
@@ -17,6 +14,7 @@ interface TeamDetailModalProps {
   onClose: () => void;
   onRemoveMember: (teamId: string, memberId: string) => void;
   onAddMember: (team: Team) => void;
+  onUpdateMember?: (teamId: string, memberId: string, updates: Partial<Omit<TeamMember, "id">>) => Promise<TeamMember>;
 }
 
 export function TeamDetailModal({
@@ -25,8 +23,17 @@ export function TeamDetailModal({
   onClose,
   onRemoveMember,
   onAddMember,
+  onUpdateMember,
 }: TeamDetailModalProps) {
+  const [viewingMember, setViewingMember] = useState<TeamMember | null>(null);
+  const [editingMember, setEditingMember] = useState<TeamMember | null>(null);
+
   if (!isOpen || !team) return null;
+
+  const handleUpdateMember = async (memberId: string, updates: Partial<Omit<TeamMember, "id">>) => {
+    if (!onUpdateMember) return;
+    await onUpdateMember(team.id, memberId, updates);
+  };
 
   const uniqueSkills = new Set(
     team.members.flatMap((m) => m.skills.map((s) => s.name))
@@ -131,39 +138,13 @@ export function TeamDetailModal({
           ) : (
             <div className="space-y-3">
               {team.members.map((member) => (
-                <div
+                <TeamMemberCard
                   key={member.id}
-                  className="group flex items-center justify-between rounded-xl border border-slate-100 bg-white p-4 shadow-sm transition-all hover:shadow-card"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-gradient-to-br from-indigo-400 to-violet-400 text-sm font-medium text-white">
-                      {member.name
-                        .split(" ")
-                        .map((n) => n[0])
-                        .join("")
-                        .slice(0, 2)
-                        .toUpperCase()}
-                    </div>
-                    <div>
-                      <p className="font-medium text-slate-900">
-                        {member.name}
-                      </p>
-                      <p className="text-sm text-slate-500">{member.role}</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-600">
-                      {EXPERIENCE_LABELS[member.experienceLevel] || member.experienceLevel}
-                    </span>
-                    <button
-                      onClick={() => onRemoveMember(team.id, member.id)}
-                      className="rounded-lg p-2 text-slate-400 opacity-0 transition-all hover:bg-red-50 hover:text-red-600 group-hover:opacity-100"
-                      title="Remove from team"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
-                  </div>
-                </div>
+                  member={member}
+                  onClick={() => setViewingMember(member)}
+                  onEdit={onUpdateMember ? () => setEditingMember(member) : undefined}
+                  onRemove={() => onRemoveMember(team.id, member.id)}
+                />
               ))}
             </div>
           )}
@@ -188,6 +169,26 @@ export function TeamDetailModal({
           )}
         </div>
       </div>
+
+      {/* Team Member Detail Modal */}
+      <TeamMemberDetailModal
+        member={viewingMember}
+        isOpen={viewingMember !== null}
+        onClose={() => setViewingMember(null)}
+        onEdit={onUpdateMember ? () => {
+          setViewingMember(null);
+          setEditingMember(viewingMember);
+        } : undefined}
+      />
+
+      {/* Edit Team Member Modal */}
+      <EditTeamMemberModal
+        team={team}
+        member={editingMember}
+        isOpen={editingMember !== null}
+        onClose={() => setEditingMember(null)}
+        onUpdateMember={handleUpdateMember}
+      />
     </div>
   );
 }

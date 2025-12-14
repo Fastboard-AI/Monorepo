@@ -1,11 +1,14 @@
 "use client";
 
+import { useState } from "react";
 import { Users, Unlink, ExternalLink } from "lucide-react";
 import Link from "next/link";
-import type { Team, Job } from "../types";
+import type { Team, Job, TeamMember } from "../types";
 import { ScoreRing } from "./ScoreRing";
 import { TeamMemberCard } from "./TeamMemberCard";
 import { TeamSelector } from "./TeamSelector";
+import { EditTeamMemberModal } from "./EditTeamMemberModal";
+import { TeamMemberDetailModal } from "./TeamMemberDetailModal";
 
 interface JobTeamPanelProps {
   job: Job;
@@ -14,6 +17,7 @@ interface JobTeamPanelProps {
   isLoadingTeams?: boolean;
   onSelectTeam: (team: Team | null) => void;
   onUnlinkTeam: () => void;
+  onUpdateTeamMember?: (teamId: string, memberId: string, updates: Partial<Omit<TeamMember, "id">>) => Promise<TeamMember>;
 }
 
 export function JobTeamPanel({
@@ -23,7 +27,16 @@ export function JobTeamPanel({
   isLoadingTeams = false,
   onSelectTeam,
   onUnlinkTeam,
+  onUpdateTeamMember,
 }: JobTeamPanelProps) {
+  const [editingMember, setEditingMember] = useState<TeamMember | null>(null);
+  const [viewingMember, setViewingMember] = useState<TeamMember | null>(null);
+
+  const handleUpdateMember = async (memberId: string, updates: Partial<Omit<TeamMember, "id">>) => {
+    if (!team || !onUpdateTeamMember) return;
+    await onUpdateTeamMember(team.id, memberId, updates);
+  };
+
   return (
     <div className="rounded-xl border border-slate-200 bg-white p-5">
       {/* Header */}
@@ -84,9 +97,14 @@ export function JobTeamPanel({
               <p className="mb-2 text-xs font-medium text-slate-500">
                 Team Members
               </p>
-              <div className="grid gap-2 sm:grid-cols-2">
+              <div className="space-y-2">
                 {team.members.map((member) => (
-                  <TeamMemberCard key={member.id} member={member} compact />
+                  <TeamMemberCard
+                    key={member.id}
+                    member={member}
+                    onClick={() => setViewingMember(member)}
+                    onEdit={onUpdateTeamMember ? () => setEditingMember(member) : undefined}
+                  />
                 ))}
               </div>
             </div>
@@ -104,6 +122,26 @@ export function JobTeamPanel({
           </div>
         </div>
       )}
+
+      {/* Team Member Detail Modal */}
+      <TeamMemberDetailModal
+        member={viewingMember}
+        isOpen={viewingMember !== null}
+        onClose={() => setViewingMember(null)}
+        onEdit={onUpdateTeamMember ? () => {
+          setViewingMember(null);
+          setEditingMember(viewingMember);
+        } : undefined}
+      />
+
+      {/* Edit Team Member Modal */}
+      <EditTeamMemberModal
+        team={team}
+        member={editingMember}
+        isOpen={editingMember !== null}
+        onClose={() => setEditingMember(null)}
+        onUpdateMember={handleUpdateMember}
+      />
     </div>
   );
 }

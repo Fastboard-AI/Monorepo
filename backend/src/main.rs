@@ -35,6 +35,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
             endpoints::update_team,
             endpoints::delete_team,
             endpoints::add_team_member,
+            endpoints::update_team_member,
             endpoints::remove_team_member,
             // Sourcing
             endpoints::search_candidates,
