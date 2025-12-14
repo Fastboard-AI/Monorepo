@@ -278,3 +278,66 @@ pub async fn get_repo_commit_count(
     let commits: Vec<GitHubCommit> = response.json().await.unwrap_or_default();
     Ok(commits.len() as u32)
 }
+
+/// Get ALL user repos with full metadata (paginated)
+/// Fetches up to 1000 repos (10 pages of 100)
+pub async fn get_all_user_repos(
+    username: &str,
+    token: &str,
+) -> Result<Vec<GitHubRepoFull>, Box<dyn std::error::Error + Send + Sync>> {
+    let client = reqwest::Client::new();
+    let mut all_repos = Vec::new();
+    let mut page = 1;
+
+    loop {
+        let url = format!(
+            "{}/users/{}/repos?sort=updated&per_page=100&page={}",
+            GITHUB_API, username, page
+        );
+
+        let response = client
+            .get(&url)
+            .header("Authorization", format!("Bearer {}", token))
+            .header("User-Agent", "FastboardAI")
+            .send()
+            .await?;
+
+        let repos: Vec<GitHubRepoFull> = response.json().await.unwrap_or_default();
+
+        if repos.is_empty() {
+            break;
+        }
+
+        all_repos.extend(repos);
+        page += 1;
+
+        // Max 10 pages (1000 repos) and rate limit protection
+        if page > 10 {
+            break;
+        }
+
+        tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+    }
+
+    Ok(all_repos)
+}
+
+/// Attempt to fetch README content from a repository
+/// Tries common README filename variations
+pub async fn get_readme_content(
+    owner: &str,
+    repo: &str,
+    token: &str,
+) -> Result<Option<String>, Box<dyn std::error::Error + Send + Sync>> {
+    let readme_files = ["README.md", "README", "readme.md", "readme", "Readme.md"];
+
+    for filename in readme_files {
+        if let Ok(content) = get_file_content(owner, repo, filename, token).await {
+            if !content.is_empty() {
+                return Ok(Some(content));
+            }
+        }
+    }
+
+    Ok(None)
+}

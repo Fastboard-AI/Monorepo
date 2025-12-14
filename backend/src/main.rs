@@ -49,6 +49,9 @@ async fn main() -> Result<(), Box<dyn Error>> {
             endpoints::analyze_github_deep,
             endpoints::get_github_profile,
             endpoints::get_github_profile_deep,
+            // Take-Home Projects
+            endpoints::generate_take_home,
+            endpoints::get_take_home,
         ])
         .launch()
         .await?;

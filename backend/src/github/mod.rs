@@ -5,3 +5,4 @@ pub mod ai_summary;
 pub mod analyze;
 pub mod embeddings;
 pub mod semantic_search;
+pub mod take_home;

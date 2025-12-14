@@ -416,6 +416,82 @@ Remove a candidate from a job.
 
 ---
 
+### Take-Home Projects
+
+Generate tailored take-home coding projects for candidates based on their GitHub repos, claimed skills, and job requirements.
+
+#### POST /api/jobs/:job_id/candidates/:candidate_id/take-home-projects
+Generate 2-3 take-home project options for a candidate.
+
+**Request (optional):**
+```json
+{
+  "force_regenerate": true
+}
+```
+
+**Response:**
+```json
+{
+  "projects": [
+    {
+      "id": "uuid",
+      "title": "Build a Rate-Limited API Gateway",
+      "description": "Create a lightweight API gateway that handles rate limiting using the token bucket algorithm...",
+      "skill_focus": ["Rust", "async programming", "Redis"],
+      "requirements": [
+        "Implement token bucket rate limiting",
+        "Support configurable limits per API key",
+        "Include Redis-backed distributed state",
+        "Add health check endpoints"
+      ],
+      "deliverables": [
+        "Working Rust application",
+        "Docker-compose setup",
+        "README with setup instructions",
+        "Unit and integration tests"
+      ],
+      "evaluation_criteria": [
+        {"criterion": "Code Quality", "weight": 30, "description": "Clean, idiomatic Rust"},
+        {"criterion": "Functionality", "weight": 40, "description": "All requirements met"},
+        {"criterion": "Testing", "weight": 20, "description": "Good test coverage"},
+        {"criterion": "Documentation", "weight": 10, "description": "Clear README"}
+      ],
+      "time_estimate_hours": 6,
+      "difficulty": "intermediate",
+      "skill_gaps_addressed": ["Redis", "distributed systems"],
+      "based_on_repos": ["my-api-project", "rust-experiments"]
+    }
+  ],
+  "analysis_summary": {
+    "repos_analyzed": 23,
+    "readmes_found": 15,
+    "primary_languages": ["Rust", "TypeScript", "Python"],
+    "skill_match_percentage": 75,
+    "identified_gaps": ["Redis", "GraphQL", "Docker"]
+  },
+  "generated_at": "2024-01-01T00:00:00Z"
+}
+```
+
+#### GET /api/jobs/:job_id/candidates/:candidate_id/take-home-projects
+Get previously generated take-home projects.
+
+**How it works:**
+1. Fetches ALL public repos for the candidate (paginated, up to 1000)
+2. For each repo: fetches README or infers purpose via AI if none exists
+3. Compares candidate skills vs job requirements to find gaps
+4. Generates 2-3 tailored project specs via Gemini AI
+5. Stores result in database for future retrieval
+
+**Fallback behavior:**
+- If no GitHub link: generates projects from claimed skills + job requirements only
+- If GitHub API fails: falls back to skills-only mode
+- If all skills match (no gaps): generates advanced challenges combining strengths
+- `analysis_summary.repos_analyzed` will be `0` when no GitHub data was available
+
+---
+
 ### Code Analysis (AI)
 
 #### POST /add_to_db
@@ -707,7 +783,8 @@ backend/
 │   │   ├── ai_analysis.rs         # AI usage detection (Gemini)
 │   │   ├── ai_summary.rs          # Developer profile generation
 │   │   ├── embeddings.rs          # Code chunking utilities
-│   │   └── semantic_search.rs     # Code categorization by keywords
+│   │   ├── semantic_search.rs     # Code categorization by keywords
+│   │   └── take_home.rs           # Take-home project generation
 │   ├── matching/
 │   │   ├── mod.rs                 # Matching module exports, TalentFitScore, ScoreWeights
 │   │   ├── skills.rs              # Skill matching with synonyms and fuzzy matching
@@ -724,7 +801,8 @@ backend/
 │       ├── ep_teams.rs            # Teams CRUD + members
 │       ├── ep_sourcing.rs         # Candidate sourcing (mock)
 │       ├── ep_candidates.rs       # Candidates CRUD + job linking
-│       └── ep_match_candidates.rs # (WIP) Matching endpoint
+│       ├── ep_match_candidates.rs # (WIP) Matching endpoint
+│       └── ep_take_home.rs        # Take-home project generation endpoints
 ├── schema.sql                     # Database schema (run in Neon)
 ├── Cargo.toml                     # Dependencies
 ├── Rocket.toml                    # Rocket configuration

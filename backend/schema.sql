@@ -143,9 +143,16 @@ CREATE TABLE IF NOT EXISTS job_candidates (
   candidate_id UUID NOT NULL REFERENCES sourced_candidates(id) ON DELETE CASCADE,
   job_match_score INT DEFAULT 0,
   team_compatibility_score INT DEFAULT 0,
+  -- Take-home project generation
+  take_home_projects JSONB DEFAULT NULL,
+  projects_generated_at TIMESTAMPTZ DEFAULT NULL,
   added_at TIMESTAMPTZ DEFAULT NOW(),
   UNIQUE(job_id, candidate_id)
 );
+
+-- Migration: Add take-home projects columns to existing job_candidates table
+-- ALTER TABLE job_candidates ADD COLUMN IF NOT EXISTS take_home_projects JSONB DEFAULT NULL;
+-- ALTER TABLE job_candidates ADD COLUMN IF NOT EXISTS projects_generated_at TIMESTAMPTZ DEFAULT NULL;
 
 -- ============================================
 -- Code Embeddings table (ephemeral - for analysis sessions)
