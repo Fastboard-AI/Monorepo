@@ -1,8 +1,9 @@
 "use client";
 
-import { X, Pencil, Github, Linkedin, Globe, Briefcase, FileCode, Code2 } from "lucide-react";
+import { X, Pencil, Github, Linkedin, Globe, Briefcase, FileCode, Code2, User } from "lucide-react";
 import type { TeamMember } from "../types";
 import { CodeCharacteristicsRadar } from "./CodeCharacteristicsRadar";
+import { AIAnalysisCard } from "./AIAnalysisCard";
 
 interface TeamMemberDetailModalProps {
   member: TeamMember | null;
@@ -174,27 +175,48 @@ export function TeamMemberDetailModal({
             </div>
           </div>
 
+          {/* AI Analysis Card */}
+          <AIAnalysisCard
+            aiDetectionScore={member.aiDetectionScore}
+            aiProficiencyScore={member.aiProficiencyScore}
+            codeAuthenticityScore={member.codeAuthenticityScore}
+            aiAnalysisDetails={member.aiAnalysisDetails}
+          />
+
+          {/* Developer Profile */}
+          {member.developerProfile && (
+            <div className="rounded-xl border border-teal-100 bg-teal-50/50 p-4">
+              <h3 className="mb-2 flex items-center gap-2 text-sm font-medium text-slate-700">
+                <User className="h-4 w-4 text-teal-500" />
+                Developer Profile
+              </h3>
+              <p className="text-sm leading-relaxed text-slate-600">
+                {member.developerProfile}
+              </p>
+            </div>
+          )}
+
           {/* Code Characteristics Radar Chart */}
           {member.codeCharacteristics ? (
             <div className="rounded-xl border border-indigo-100 bg-indigo-50/50 p-4">
               <h3 className="mb-2 text-sm font-medium text-slate-700">Code Style Analysis</h3>
               {/* Confidence metrics */}
               <div className="mb-4 flex flex-wrap items-center gap-3 text-xs text-slate-500">
-                {member.codeCharacteristics.files_analyzed !== undefined && (
+                {(member.analysisMetadata?.chunks_analyzed ?? member.codeCharacteristics.files_analyzed) !== undefined && (
                   <span className="inline-flex items-center gap-1">
                     <FileCode className="h-3 w-3" />
-                    {member.codeCharacteristics.files_analyzed} files analyzed
+                    {member.analysisMetadata?.chunks_analyzed ?? member.codeCharacteristics.files_analyzed} files analyzed
                   </span>
                 )}
-                {member.codeCharacteristics.total_lines_analyzed !== undefined && (
+                {(member.analysisMetadata?.total_lines ?? member.codeCharacteristics.total_lines_analyzed) !== undefined && (
                   <span className="inline-flex items-center gap-1">
                     <Code2 className="h-3 w-3" />
-                    {member.codeCharacteristics.total_lines_analyzed.toLocaleString()} lines
+                    {(member.analysisMetadata?.total_lines ?? member.codeCharacteristics.total_lines_analyzed ?? 0).toLocaleString()} lines
                   </span>
                 )}
-                {member.codeCharacteristics.languages_detected && member.codeCharacteristics.languages_detected.length > 0 && (
+                {(member.analysisMetadata?.languages_detected ?? member.codeCharacteristics.languages_detected)?.length && (
                   <span className="text-indigo-600">
-                    {member.codeCharacteristics.languages_detected.join(", ")}
+                    {(member.analysisMetadata?.languages_detected ?? member.codeCharacteristics.languages_detected ?? []).join(", ")}
                   </span>
                 )}
               </div>

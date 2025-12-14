@@ -268,12 +268,27 @@ Special cases:
 - Empty team: 0
 - Single member: 75
 
-### Code Style Radar Chart
+### Team Member Detail View
 
 Team members with analyzed code display a chart badge on their avatar. Click any team member card to open a detail view showing:
+
+**Profile & Links:**
 - Full profile with GitHub, LinkedIn, and website links
 - All skills and experience level
-- Work style preferences
+- Work style preferences (communication, collaboration, pace)
+
+**AI Analysis Card:**
+- **AI Detection** - Score showing likelihood of AI-generated code (0-100%)
+- **AI Proficiency** - How effectively they use AI tools (0-100%)
+- **Code Authenticity** - Personal style indicators (0-100%)
+- Analysis reasoning from the AI
+
+**Developer Profile:**
+- AI-generated personality description based on their code
+- Coding style observations (naming conventions, patterns, preferences)
+- Interests and focus areas inferred from repositories
+
+**Code Style Radar Chart:**
 - Confidence metrics (files analyzed, lines, languages)
 - Interactive radar chart visualizing all 10 code metrics
 
@@ -305,7 +320,17 @@ This replaces brittle regex-based extraction with robust LLM understanding.
   },
   "github": "sarahchen",
   "linkedin": "https://linkedin.com/in/sarahchen",
-  "website": "https://sarahchen.dev"
+  "website": "https://sarahchen.dev",
+  "ai_detection_score": 65.0,
+  "ai_proficiency_score": 80.0,
+  "code_authenticity_score": 55.0,
+  "developer_profile": "A pragmatic developer who prefers clarity...",
+  "analysis_metadata": {
+    "chunks_analyzed": 25,
+    "total_lines": 5000,
+    "repos_analyzed": 5,
+    "languages_detected": ["TypeScript", "Rust"]
+  }
 }
 ```
 

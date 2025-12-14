@@ -79,6 +79,20 @@ export interface CodeCharacteristics {
   languages_detected?: string[];
 }
 
+// AI Analysis scores from GitHub analysis
+export interface AIAnalysisDetails {
+  patterns_detected: string[];
+  confidence: number;
+  reasoning: string;
+}
+
+export interface AnalysisMetadata {
+  chunks_analyzed: number;
+  total_lines: number;
+  repos_analyzed: number;
+  languages_detected: string[];
+}
+
 // Team member = existing employee (not a candidate)
 export interface TeamMember {
   id: string;
@@ -91,6 +105,13 @@ export interface TeamMember {
   linkedin?: string;
   website?: string;
   codeCharacteristics?: CodeCharacteristics;
+  // AI Analysis fields
+  aiDetectionScore?: number;
+  aiProficiencyScore?: number;
+  codeAuthenticityScore?: number;
+  aiAnalysisDetails?: AIAnalysisDetails;
+  developerProfile?: string;
+  analysisMetadata?: AnalysisMetadata;
 }
 
 export interface Team {

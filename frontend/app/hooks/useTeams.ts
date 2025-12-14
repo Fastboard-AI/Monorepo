@@ -24,6 +24,13 @@ function apiToTeamMember(apiMember: ApiTeamMember): TeamMember {
     linkedin: apiMember.linkedin,
     website: apiMember.website,
     codeCharacteristics: apiMember.code_characteristics,
+    // AI Analysis fields
+    aiDetectionScore: apiMember.ai_detection_score,
+    aiProficiencyScore: apiMember.ai_proficiency_score,
+    codeAuthenticityScore: apiMember.code_authenticity_score,
+    aiAnalysisDetails: apiMember.ai_analysis_details,
+    developerProfile: apiMember.developer_profile,
+    analysisMetadata: apiMember.analysis_metadata,
   };
 }
 

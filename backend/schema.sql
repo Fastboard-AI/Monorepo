@@ -34,15 +34,28 @@ CREATE TABLE IF NOT EXISTS team_members (
   website VARCHAR,
   code_characteristics JSONB DEFAULT NULL,
   github_stats JSONB DEFAULT NULL,
+  -- AI Analysis fields
+  ai_detection_score FLOAT,
+  ai_proficiency_score FLOAT,
+  code_authenticity_score FLOAT,
+  ai_analysis_details JSONB,
+  developer_profile TEXT,
+  analysis_metadata JSONB,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Migration: Add developer links to existing team_members table
+-- Migration: Add AI analysis columns to existing team_members table
 -- ALTER TABLE team_members ADD COLUMN IF NOT EXISTS github VARCHAR;
 -- ALTER TABLE team_members ADD COLUMN IF NOT EXISTS linkedin VARCHAR;
 -- ALTER TABLE team_members ADD COLUMN IF NOT EXISTS website VARCHAR;
 -- ALTER TABLE team_members ADD COLUMN IF NOT EXISTS code_characteristics JSONB DEFAULT NULL;
 -- ALTER TABLE team_members ADD COLUMN IF NOT EXISTS github_stats JSONB DEFAULT NULL;
+-- ALTER TABLE team_members ADD COLUMN IF NOT EXISTS ai_detection_score FLOAT;
+-- ALTER TABLE team_members ADD COLUMN IF NOT EXISTS ai_proficiency_score FLOAT;
+-- ALTER TABLE team_members ADD COLUMN IF NOT EXISTS code_authenticity_score FLOAT;
+-- ALTER TABLE team_members ADD COLUMN IF NOT EXISTS ai_analysis_details JSONB;
+-- ALTER TABLE team_members ADD COLUMN IF NOT EXISTS developer_profile TEXT;
+-- ALTER TABLE team_members ADD COLUMN IF NOT EXISTS analysis_metadata JSONB;
 
 -- ============================================
 -- Jobs table

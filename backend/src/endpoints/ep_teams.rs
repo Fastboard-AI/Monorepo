@@ -62,6 +62,13 @@ struct TeamMemberRow {
     website: Option<String>,
     code_characteristics: Option<serde_json::Value>,
     github_stats: Option<serde_json::Value>,
+    // AI Analysis fields
+    ai_detection_score: Option<f64>,
+    ai_proficiency_score: Option<f64>,
+    code_authenticity_score: Option<f64>,
+    ai_analysis_details: Option<serde_json::Value>,
+    developer_profile: Option<String>,
+    analysis_metadata: Option<serde_json::Value>,
 }
 
 #[derive(Serialize)]
@@ -109,40 +116,49 @@ fn calculate_team_score(members: &[TeamMemberRow]) -> i32 {
     (base_score + diversity_bonus + style_bonus).min(100.0).round() as i32
 }
 
+/// Parse a team member row from database
+fn parse_team_member_row(m: &sqlx::postgres::PgRow) -> TeamMemberRow {
+    let skills_json: Option<serde_json::Value> = m.get("skills");
+    let work_style_json: Option<serde_json::Value> = m.get("work_style");
+    TeamMemberRow {
+        id: m.get::<uuid::Uuid, _>("id").to_string(),
+        name: m.get("name"),
+        role: m.get("role"),
+        skills: serde_json::from_value(skills_json.unwrap_or(serde_json::json!([]))).unwrap_or_default(),
+        experience_level: m.get::<Option<String>, _>("experience_level").unwrap_or_else(|| "mid".to_string()),
+        work_style: serde_json::from_value(work_style_json.unwrap_or(serde_json::json!({"communication":"mixed","collaboration":"balanced","pace":"steady"}))).unwrap_or(WorkStyle {
+            communication: "mixed".to_string(),
+            collaboration: "balanced".to_string(),
+            pace: "steady".to_string(),
+        }),
+        github: m.get("github"),
+        linkedin: m.get("linkedin"),
+        website: m.get("website"),
+        code_characteristics: m.get("code_characteristics"),
+        github_stats: m.get("github_stats"),
+        ai_detection_score: m.get("ai_detection_score"),
+        ai_proficiency_score: m.get("ai_proficiency_score"),
+        code_authenticity_score: m.get("code_authenticity_score"),
+        ai_analysis_details: m.get("ai_analysis_details"),
+        developer_profile: m.get("developer_profile"),
+        analysis_metadata: m.get("analysis_metadata"),
+    }
+}
+
+const TEAM_MEMBER_SELECT: &str = "SELECT id, name, role, skills, experience_level, work_style, github, linkedin, website, code_characteristics, github_stats, ai_detection_score, ai_proficiency_score, code_authenticity_score, ai_analysis_details, developer_profile, analysis_metadata FROM team_members";
+
 /// Fetch team members and recalculate team score
 async fn recalculate_and_update_team_score(
     team_id: uuid::Uuid,
     db: &mut Connection<MainDatabase>
 ) {
-    let rows = sqlx::query(
-        "SELECT id, name, role, skills, experience_level, work_style, github, linkedin, website, code_characteristics, github_stats FROM team_members WHERE team_id = $1"
-    )
+    let rows = sqlx::query(&format!("{} WHERE team_id = $1", TEAM_MEMBER_SELECT))
     .bind(team_id)
     .fetch_all(&mut ***db)
     .await
     .unwrap_or_default();
 
-    let members: Vec<TeamMemberRow> = rows.into_iter().map(|m| {
-        let skills_json: Option<serde_json::Value> = m.get("skills");
-        let work_style_json: Option<serde_json::Value> = m.get("work_style");
-        TeamMemberRow {
-            id: m.get::<uuid::Uuid, _>("id").to_string(),
-            name: m.get("name"),
-            role: m.get("role"),
-            skills: serde_json::from_value(skills_json.unwrap_or(serde_json::json!([]))).unwrap_or_default(),
-            experience_level: m.get::<Option<String>, _>("experience_level").unwrap_or_else(|| "mid".to_string()),
-            work_style: serde_json::from_value(work_style_json.unwrap_or(serde_json::json!({"communication":"mixed","collaboration":"balanced","pace":"steady"}))).unwrap_or(WorkStyle {
-                communication: "mixed".to_string(),
-                collaboration: "balanced".to_string(),
-                pace: "steady".to_string(),
-            }),
-            github: m.get("github"),
-            linkedin: m.get("linkedin"),
-            website: m.get("website"),
-            code_characteristics: m.get("code_characteristics"),
-            github_stats: m.get("github_stats"),
-        }
-    }).collect();
+    let members: Vec<TeamMemberRow> = rows.iter().map(parse_team_member_row).collect();
 
     let score = calculate_team_score(&members);
 
@@ -167,38 +183,13 @@ pub async fn get_teams(mut db: Connection<MainDatabase>) -> RawJson<String> {
     for r in rows {
         let team_id: uuid::Uuid = r.get("id");
 
-        let members_rows = sqlx::query(
-            r#"SELECT id, name, role, skills, experience_level, work_style, github, linkedin, website, code_characteristics, github_stats FROM team_members WHERE team_id = $1"#
-        )
+        let members_rows = sqlx::query(&format!("{} WHERE team_id = $1", TEAM_MEMBER_SELECT))
         .bind(team_id)
         .fetch_all(&mut **db)
         .await
         .unwrap();
 
-        let members: Vec<TeamMemberRow> = members_rows
-            .into_iter()
-            .map(|m| {
-                let skills_json: Option<serde_json::Value> = m.get("skills");
-                let work_style_json: Option<serde_json::Value> = m.get("work_style");
-                TeamMemberRow {
-                    id: m.get::<uuid::Uuid, _>("id").to_string(),
-                    name: m.get("name"),
-                    role: m.get("role"),
-                    skills: serde_json::from_value(skills_json.unwrap_or(serde_json::json!([]))).unwrap_or_default(),
-                    experience_level: m.get::<Option<String>, _>("experience_level").unwrap_or_else(|| "mid".to_string()),
-                    work_style: serde_json::from_value(work_style_json.unwrap_or(serde_json::json!({"communication":"mixed","collaboration":"balanced","pace":"steady"}))).unwrap_or(WorkStyle {
-                        communication: "mixed".to_string(),
-                        collaboration: "balanced".to_string(),
-                        pace: "steady".to_string(),
-                    }),
-                    github: m.get("github"),
-                    linkedin: m.get("linkedin"),
-                    website: m.get("website"),
-                    code_characteristics: m.get("code_characteristics"),
-                    github_stats: m.get("github_stats"),
-                }
-            })
-            .collect();
+        let members: Vec<TeamMemberRow> = members_rows.iter().map(parse_team_member_row).collect();
 
         teams.push(TeamRow {
             id: team_id.to_string(),
@@ -226,38 +217,13 @@ pub async fn get_team(id: &str, mut db: Connection<MainDatabase>) -> RawJson<Str
     .await
     .unwrap();
 
-    let members_rows = sqlx::query(
-        r#"SELECT id, name, role, skills, experience_level, work_style, github, linkedin, website, code_characteristics, github_stats FROM team_members WHERE team_id = $1"#
-    )
+    let members_rows = sqlx::query(&format!("{} WHERE team_id = $1", TEAM_MEMBER_SELECT))
     .bind(uuid)
     .fetch_all(&mut **db)
     .await
     .unwrap();
 
-    let members: Vec<TeamMemberRow> = members_rows
-        .into_iter()
-        .map(|m| {
-            let skills_json: Option<serde_json::Value> = m.get("skills");
-            let work_style_json: Option<serde_json::Value> = m.get("work_style");
-            TeamMemberRow {
-                id: m.get::<uuid::Uuid, _>("id").to_string(),
-                name: m.get("name"),
-                role: m.get("role"),
-                skills: serde_json::from_value(skills_json.unwrap_or(serde_json::json!([]))).unwrap_or_default(),
-                experience_level: m.get::<Option<String>, _>("experience_level").unwrap_or_else(|| "mid".to_string()),
-                work_style: serde_json::from_value(work_style_json.unwrap_or(serde_json::json!({"communication":"mixed","collaboration":"balanced","pace":"steady"}))).unwrap_or(WorkStyle {
-                    communication: "mixed".to_string(),
-                    collaboration: "balanced".to_string(),
-                    pace: "steady".to_string(),
-                }),
-                github: m.get("github"),
-                linkedin: m.get("linkedin"),
-                website: m.get("website"),
-                code_characteristics: m.get("code_characteristics"),
-                github_stats: m.get("github_stats"),
-            }
-        })
-        .collect();
+    let members: Vec<TeamMemberRow> = members_rows.iter().map(parse_team_member_row).collect();
 
     let team = TeamRow {
         id: row.get::<uuid::Uuid, _>("id").to_string(),
@@ -379,6 +345,15 @@ pub async fn add_team_member<'a>(team_id: &str, data: json::Json<CreateTeamMembe
                     .await
                     .ok();
 
+                // Generate developer profile from stats
+                let profile = if let Some(ref s) = stats {
+                    crate::github::ai_summary::generate_developer_profile(s)
+                        .await
+                        .ok()
+                } else {
+                    None
+                };
+
                 if let Ok(pool) = sqlx::PgPool::connect(&db_url).await {
                     let member_uuid = uuid::Uuid::parse_str(&member_id).unwrap();
 
@@ -390,9 +365,31 @@ pub async fn add_team_member<'a>(team_id: &str, data: json::Json<CreateTeamMembe
                             .await;
                     }
 
-                    if let Some(stats) = stats {
+                    if let Some(ref stats) = stats {
+                        // Store full stats as JSON
                         let _ = sqlx::query("UPDATE team_members SET github_stats = $1 WHERE id = $2")
                             .bind(serde_json::to_value(&stats).unwrap())
+                            .bind(member_uuid)
+                            .execute(&pool)
+                            .await;
+
+                        // Also store AI analysis in dedicated columns for easier access
+                        let _ = sqlx::query(
+                            "UPDATE team_members SET ai_detection_score = $1, ai_proficiency_score = $2, code_authenticity_score = $3, ai_analysis_details = $4, analysis_metadata = $5 WHERE id = $6"
+                        )
+                            .bind(stats.ai_analysis.ai_detection_score as f64)
+                            .bind(stats.ai_analysis.ai_proficiency_score as f64)
+                            .bind(stats.ai_analysis.code_authenticity_score as f64)
+                            .bind(serde_json::to_value(&stats.ai_analysis.analysis_details).unwrap())
+                            .bind(serde_json::to_value(&stats.analysis_metadata).unwrap())
+                            .bind(member_uuid)
+                            .execute(&pool)
+                            .await;
+                    }
+
+                    if let Some(profile) = profile {
+                        let _ = sqlx::query("UPDATE team_members SET developer_profile = $1 WHERE id = $2")
+                            .bind(&profile)
                             .bind(member_uuid)
                             .execute(&pool)
                             .await;
@@ -417,6 +414,12 @@ pub async fn add_team_member<'a>(team_id: &str, data: json::Json<CreateTeamMembe
         website: data.website.map(String::from),
         code_characteristics: None, // Will be populated async
         github_stats: None, // Will be populated async
+        ai_detection_score: None,
+        ai_proficiency_score: None,
+        code_authenticity_score: None,
+        ai_analysis_details: None,
+        developer_profile: None,
+        analysis_metadata: None,
     };
 
     RawJson(serde_json::to_string(&member).unwrap())
@@ -517,6 +520,15 @@ pub async fn update_team_member<'a>(
                         .await
                         .ok();
 
+                    // Generate developer profile from stats
+                    let profile = if let Some(ref s) = stats {
+                        crate::github::ai_summary::generate_developer_profile(s)
+                            .await
+                            .ok()
+                    } else {
+                        None
+                    };
+
                     if let Ok(pool) = sqlx::PgPool::connect(&db_url).await {
                         let muuid = uuid::Uuid::parse_str(&mid).unwrap();
 
@@ -528,9 +540,30 @@ pub async fn update_team_member<'a>(
                                 .await;
                         }
 
-                        if let Some(stats) = stats {
+                        if let Some(ref stats) = stats {
                             let _ = sqlx::query("UPDATE team_members SET github_stats = $1 WHERE id = $2")
                                 .bind(serde_json::to_value(&stats).unwrap())
+                                .bind(muuid)
+                                .execute(&pool)
+                                .await;
+
+                            // Also store AI analysis in dedicated columns
+                            let _ = sqlx::query(
+                                "UPDATE team_members SET ai_detection_score = $1, ai_proficiency_score = $2, code_authenticity_score = $3, ai_analysis_details = $4, analysis_metadata = $5 WHERE id = $6"
+                            )
+                                .bind(stats.ai_analysis.ai_detection_score as f64)
+                                .bind(stats.ai_analysis.ai_proficiency_score as f64)
+                                .bind(stats.ai_analysis.code_authenticity_score as f64)
+                                .bind(serde_json::to_value(&stats.ai_analysis.analysis_details).unwrap())
+                                .bind(serde_json::to_value(&stats.analysis_metadata).unwrap())
+                                .bind(muuid)
+                                .execute(&pool)
+                                .await;
+                        }
+
+                        if let Some(profile) = profile {
+                            let _ = sqlx::query("UPDATE team_members SET developer_profile = $1 WHERE id = $2")
+                                .bind(&profile)
                                 .bind(muuid)
                                 .execute(&pool)
                                 .await;
@@ -560,34 +593,13 @@ pub async fn update_team_member<'a>(
     recalculate_and_update_team_score(team_uuid, &mut db).await;
 
     // Fetch and return updated member
-    let row = sqlx::query(
-        r#"SELECT id, name, role, skills, experience_level, work_style, github, linkedin, website, code_characteristics, github_stats FROM team_members WHERE id = $1"#
-    )
+    let row = sqlx::query(&format!("{} WHERE id = $1", TEAM_MEMBER_SELECT))
     .bind(member_uuid)
     .fetch_one(&mut **db)
     .await
     .unwrap();
 
-    let skills_json: Option<serde_json::Value> = row.get("skills");
-    let work_style_json: Option<serde_json::Value> = row.get("work_style");
-
-    let member = TeamMemberRow {
-        id: row.get::<uuid::Uuid, _>("id").to_string(),
-        name: row.get("name"),
-        role: row.get("role"),
-        skills: serde_json::from_value(skills_json.unwrap_or(serde_json::json!([]))).unwrap_or_default(),
-        experience_level: row.get::<Option<String>, _>("experience_level").unwrap_or_else(|| "mid".to_string()),
-        work_style: serde_json::from_value(work_style_json.unwrap_or(serde_json::json!({"communication":"mixed","collaboration":"balanced","pace":"steady"}))).unwrap_or(WorkStyle {
-            communication: "mixed".to_string(),
-            collaboration: "balanced".to_string(),
-            pace: "steady".to_string(),
-        }),
-        github: row.get("github"),
-        linkedin: row.get("linkedin"),
-        website: row.get("website"),
-        code_characteristics: row.get("code_characteristics"),
-        github_stats: row.get("github_stats"),
-    };
+    let member = parse_team_member_row(&row);
 
     RawJson(serde_json::to_string(&member).unwrap())
 }

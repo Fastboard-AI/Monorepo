@@ -69,6 +69,22 @@ export interface ApiTeamMember {
     error_handling_centralization_score: number;
     test_structure_modularity_ratio: number;
   };
+  // AI Analysis fields
+  ai_detection_score?: number;
+  ai_proficiency_score?: number;
+  code_authenticity_score?: number;
+  ai_analysis_details?: {
+    patterns_detected: string[];
+    confidence: number;
+    reasoning: string;
+  };
+  developer_profile?: string;
+  analysis_metadata?: {
+    chunks_analyzed: number;
+    total_lines: number;
+    repos_analyzed: number;
+    languages_detected: string[];
+  };
 }
 
 export interface ApiTeam {
