@@ -78,7 +78,7 @@ The server starts at `http://localhost:8000`.
 ### Jobs
 
 #### GET /api/jobs
-List all jobs.
+List all jobs with their linked candidate IDs.
 
 **Response:**
 ```json
@@ -92,12 +92,14 @@ List all jobs.
     "experience_level": "senior",
     "status": "sourcing",
     "team_id": "uuid",
-    "candidate_ids": [],
+    "candidate_ids": ["candidate-uuid-1", "candidate-uuid-2"],
     "created_at": "2024-01-01T00:00:00Z",
     "updated_at": "2024-01-01T00:00:00Z"
   }
 ]
 ```
+
+**Note:** `candidate_ids` contains UUIDs of all candidates linked to the job via the `job_candidates` table.
 
 #### GET /api/jobs/:id
 Get a single job.
